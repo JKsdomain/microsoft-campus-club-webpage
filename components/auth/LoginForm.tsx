@@ -38,6 +38,15 @@ export const LoginForm: React.FC<LoginFormProps> = ({
       });
 
       if (response.ok) {
+        if (role === "admin") {
+          localStorage.setItem("mcc_admin_authenticated", "true");
+          localStorage.setItem("mcc_admin_email", email.trim());
+          document.cookie = `mcc_admin_session=${encodeURIComponent(email.trim())}; path=/; max-age=86400; SameSite=Lax`;
+        } else {
+          localStorage.setItem("mcc_ob_authenticated", "true");
+          localStorage.setItem("mcc_ob_email", email.trim());
+          document.cookie = `mcc_ob_session=${encodeURIComponent(email.trim())}; path=/; max-age=86400; SameSite=Lax`;
+        }
         setModalType("success");
       } else {
         setModalType("invalid");
@@ -53,15 +62,11 @@ export const LoginForm: React.FC<LoginFormProps> = ({
     const currentModal = modalType;
     setModalType(null);
 
-    // If login was successful, set auth flag and navigate to role dashboard after user clicks OK
+    // Navigate cleanly after authenticated session is established
     if (currentModal === "success") {
       if (role === "admin") {
-        localStorage.setItem("mcc_admin_authenticated", "true");
-        localStorage.setItem("mcc_admin_email", email);
         router.push("/admin/dashboard");
       } else {
-        localStorage.setItem("mcc_ob_authenticated", "true");
-        localStorage.setItem("mcc_ob_email", email);
         router.push("/office-bearer/dashboard");
       }
     }

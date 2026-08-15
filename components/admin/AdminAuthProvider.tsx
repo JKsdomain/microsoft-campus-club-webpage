@@ -19,6 +19,7 @@ import {
 
 interface AdminAuthContextType {
   isAuthenticated: boolean;
+  isHydrated: boolean;
   adminName: string;
   adminEmail: string;
   loginAdmin: (email: string) => void;
@@ -56,6 +57,7 @@ const AdminAuthContext = createContext<AdminAuthContextType | undefined>(undefin
 
 export const AdminAuthProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
   const [isAuthenticated, setIsAuthenticated] = useState<boolean>(false);
+  const [isHydrated, setIsHydrated] = useState<boolean>(false);
   const [adminName] = useState<string>("Administrator");
   const [adminEmail, setAdminEmail] = useState<string>("admin@mcc.edu");
 
@@ -66,10 +68,11 @@ export const AdminAuthProvider: React.FC<{ children: React.ReactNode }> = ({ chi
   const [auditLogs, setAuditLogs] = useState<AuditLog[]>(INITIAL_AUDIT_LOGS);
   const [activityAvailability, setActivityAvailability] = useState<ActivityAvailabilityMap>(INITIAL_ACTIVITY_AVAILABILITY);
 
-  // Sync state with localStorage if in browser environment
+  // Sync state with localStorage and cookies if in browser environment
   useEffect(() => {
     const savedAuth = localStorage.getItem("mcc_admin_authenticated");
-    if (savedAuth === "true") {
+    const hasCookie = typeof document !== "undefined" && document.cookie.includes("mcc_admin_session");
+    if (savedAuth === "true" || hasCookie) {
       setIsAuthenticated(true);
     } else {
       setIsAuthenticated(false);
@@ -94,6 +97,7 @@ export const AdminAuthProvider: React.FC<{ children: React.ReactNode }> = ({ chi
         console.error("Failed to parse activity availability", e);
       }
     }
+    setIsHydrated(true);
   }, []);
 
   const saveAnnouncements = (newAnnouncements: Announcement[]) => {
@@ -110,6 +114,9 @@ export const AdminAuthProvider: React.FC<{ children: React.ReactNode }> = ({ chi
     setAdminEmail(email);
     localStorage.setItem("mcc_admin_authenticated", "true");
     localStorage.setItem("mcc_admin_email", email);
+    if (typeof document !== "undefined") {
+      document.cookie = `mcc_admin_session=${encodeURIComponent(email)}; path=/; max-age=86400; SameSite=Lax`;
+    }
     addAuditLog("Admin Login", "Authentication", "Success");
   };
 
@@ -117,6 +124,9 @@ export const AdminAuthProvider: React.FC<{ children: React.ReactNode }> = ({ chi
     setIsAuthenticated(false);
     localStorage.removeItem("mcc_admin_authenticated");
     localStorage.removeItem("mcc_admin_email");
+    if (typeof document !== "undefined") {
+      document.cookie = "mcc_admin_session=; path=/; expires=Thu, 01 Jan 1970 00:00:00 GMT";
+    }
     addAuditLog("Admin Logout", "Authentication", "Success");
   };
 
@@ -315,6 +325,7 @@ export const AdminAuthProvider: React.FC<{ children: React.ReactNode }> = ({ chi
     <AdminAuthContext.Provider
       value={{
         isAuthenticated,
+        isHydrated,
         adminName,
         adminEmail,
         loginAdmin,

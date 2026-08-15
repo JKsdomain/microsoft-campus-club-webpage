@@ -9,21 +9,33 @@ import { AdminHeader } from "@/components/admin/AdminHeader";
 function AdminLayoutInner({ children }: { children: React.ReactNode }) {
   const pathname = usePathname();
   const router = useRouter();
-  const { isAuthenticated } = useAdminAuth();
+  const { isAuthenticated, isHydrated } = useAdminAuth();
   const [mobileSidebarOpen, setMobileSidebarOpen] = useState(false);
 
   const isLoginPage = pathname === "/admin/login";
 
   useEffect(() => {
-    // Auth Guard: If not on login page and not authenticated, redirect to /admin/login
-    if (!isLoginPage && !isAuthenticated) {
+    // Auth Guard: If not on login page and not authenticated after hydration, redirect to /admin/login
+    if (isHydrated && !isLoginPage && !isAuthenticated) {
       router.push("/admin/login");
     }
-  }, [isAuthenticated, isLoginPage, router]);
+  }, [isAuthenticated, isHydrated, isLoginPage, router]);
 
   // If on login page, render children directly (no sidebar/header)
   if (isLoginPage) {
     return <>{children}</>;
+  }
+
+  // If session is still hydrating on protected routes, display smooth loading state
+  if (!isHydrated) {
+    return (
+      <div className="min-h-screen bg-[#07111F] text-[#F8FAFC] flex items-center justify-center p-4">
+        <div className="flex items-center space-x-3 text-sm text-[#94A3B8]">
+          <span className="w-5 h-5 border-2 border-[#0078D4] border-t-transparent rounded-full animate-spin" />
+          <span>Verifying session...</span>
+        </div>
+      </div>
+    );
   }
 
   // Map route to clean header title

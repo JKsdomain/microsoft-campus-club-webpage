@@ -24,10 +24,12 @@ export async function POST(req: Request) {
         const adminDoc = await Admin.findOne({ email: cleanEmail });
         if (adminDoc && adminDoc.status === "ACTIVE") {
           console.log(`✅ [AUTH API] Admin login verified from MongoDB for: ${cleanEmail}`);
-          return NextResponse.json({
+          const res = NextResponse.json({
             message: "Admin authentication successful",
             user: { id: adminDoc._id, name: adminDoc.name, email: adminDoc.email, role: "ADMIN" },
           });
+          res.cookies.set("mcc_admin_session", cleanEmail, { path: "/", httpOnly: false, sameSite: "lax", maxAge: 86400 });
+          return res;
         }
       } catch (dbErr: any) {
         console.log(`⚠️ [AUTH API] MongoDB not connected yet (${dbErr.message}). Using local admin verification.`);
@@ -36,10 +38,12 @@ export async function POST(req: Request) {
       // Default Admin credential verification
       if ((cleanEmail === "admin@mcc.edu" || cleanEmail.startsWith("admin")) && (password === "admin123" || password === "admin" || password.length > 0)) {
         console.log(`✅ [AUTH API] Default Admin credentials verified for: ${cleanEmail}`);
-        return NextResponse.json({
+        const res = NextResponse.json({
           message: "Admin authentication successful",
           user: { name: "Administrator", email: "admin@mcc.edu", role: "ADMIN" },
         });
+        res.cookies.set("mcc_admin_session", cleanEmail, { path: "/", httpOnly: false, sameSite: "lax", maxAge: 86400 });
+        return res;
       }
 
       console.log(`❌ [AUTH API] Admin login failed for: ${cleanEmail}`);
@@ -59,7 +63,7 @@ export async function POST(req: Request) {
 
       if (obFound) {
         console.log(`✅ [AUTH API] Office Bearer verified from MongoDB for: ${cleanEmail}`);
-        return NextResponse.json({
+        const res = NextResponse.json({
           message: "Office Bearer authentication successful",
           user: {
             id: String(obFound._id),
@@ -70,6 +74,8 @@ export async function POST(req: Request) {
             role: "OFFICE_BEARER",
           },
         });
+        res.cookies.set("mcc_ob_session", cleanEmail, { path: "/", httpOnly: false, sameSite: "lax", maxAge: 86400 });
+        return res;
       }
 
       console.log(`❌ [AUTH API] Office Bearer login REJECTED (account not found or inactive) for: ${cleanEmail}`);

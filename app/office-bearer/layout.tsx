@@ -9,20 +9,31 @@ import { OBHeader } from "@/components/office-bearer/OBHeader";
 function OBLayoutInner({ children }: { children: React.ReactNode }) {
   const pathname = usePathname();
   const router = useRouter();
-  const { isAuthenticated } = useOBAuth();
+  const { isAuthenticated, isHydrated } = useOBAuth();
   const [mobileSidebarOpen, setMobileSidebarOpen] = useState(false);
 
   const isLoginPage = pathname === "/office-bearer/login";
 
   useEffect(() => {
-    // Auth Guard: If not on login page and not authenticated, redirect to /office-bearer/login
-    if (!isLoginPage && !isAuthenticated) {
+    // Auth Guard: If not on login page and not authenticated after hydration, redirect to /office-bearer/login
+    if (isHydrated && !isLoginPage && !isAuthenticated) {
       router.push("/office-bearer/login");
     }
-  }, [isAuthenticated, isLoginPage, router]);
+  }, [isAuthenticated, isHydrated, isLoginPage, router]);
 
   if (isLoginPage) {
     return <>{children}</>;
+  }
+
+  if (!isHydrated) {
+    return (
+      <div className="min-h-screen bg-[#07111F] text-[#F8FAFC] flex items-center justify-center p-4">
+        <div className="flex items-center space-x-3 text-sm text-[#94A3B8]">
+          <span className="w-5 h-5 border-2 border-[#0078D4] border-t-transparent rounded-full animate-spin" />
+          <span>Verifying session...</span>
+        </div>
+      </div>
+    );
   }
 
   const getPageTitle = () => {

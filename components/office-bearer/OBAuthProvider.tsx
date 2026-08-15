@@ -12,8 +12,9 @@ import {
 
 interface OBAuthContextType {
   isAuthenticated: boolean;
+  isHydrated: boolean;
   currentOb: OBProfile;
-  loginOb: (email: string) => void;
+  loginOb: (email: string, obData?: Partial<OBProfile>) => void;
   logoutOb: () => void;
   switchObPersona: (obId: string) => void;
   hasResponsibility: (activityName: "Placement Questions" | "General Quiz" | "Technical Games" | "Feed Community") => boolean;
@@ -39,13 +40,15 @@ const EMPTY_OB: OBProfile = {
 
 export const OBAuthProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
   const [isAuthenticated, setIsAuthenticated] = useState<boolean>(false);
+  const [isHydrated, setIsHydrated] = useState<boolean>(false);
   const [currentOb, setCurrentOb] = useState<OBProfile>(EMPTY_OB);
   const [submissions, setSubmissions] = useState<QuizSubmission[]>(INITIAL_SUBMISSIONS);
   const [feedPosts, setFeedPosts] = useState<FeedPostItem[]>(INITIAL_FEED_POSTS);
 
   useEffect(() => {
     const savedAuth = localStorage.getItem("mcc_ob_authenticated");
-    if (savedAuth === "true") {
+    const hasCookie = typeof document !== "undefined" && document.cookie.includes("mcc_ob_session");
+    if (savedAuth === "true" || hasCookie) {
       setIsAuthenticated(true);
       const savedEmail = localStorage.getItem("mcc_ob_email") || "";
       const savedName = localStorage.getItem("mcc_ob_name") || "Office Bearer";
@@ -62,6 +65,7 @@ export const OBAuthProvider: React.FC<{ children: React.ReactNode }> = ({ childr
       setIsAuthenticated(false);
       setCurrentOb(EMPTY_OB);
     }
+    setIsHydrated(true);
   }, []);
 
   const loginOb = (email: string, obData?: Partial<OBProfile>) => {
@@ -80,6 +84,9 @@ export const OBAuthProvider: React.FC<{ children: React.ReactNode }> = ({ childr
     localStorage.setItem("mcc_ob_name", newOb.name);
     localStorage.setItem("mcc_ob_dept", newOb.department);
     localStorage.setItem("mcc_ob_resp", newOb.assignedResponsibility);
+    if (typeof document !== "undefined") {
+      document.cookie = `mcc_ob_session=${encodeURIComponent(email)}; path=/; max-age=86400; SameSite=Lax`;
+    }
   };
 
   const logoutOb = () => {
@@ -90,6 +97,9 @@ export const OBAuthProvider: React.FC<{ children: React.ReactNode }> = ({ childr
     localStorage.removeItem("mcc_ob_name");
     localStorage.removeItem("mcc_ob_dept");
     localStorage.removeItem("mcc_ob_resp");
+    if (typeof document !== "undefined") {
+      document.cookie = "mcc_ob_session=; path=/; expires=Thu, 01 Jan 1970 00:00:00 GMT";
+    }
   };
 
   const switchObPersona = (obId: string) => {
@@ -180,6 +190,7 @@ export const OBAuthProvider: React.FC<{ children: React.ReactNode }> = ({ childr
     <OBAuthContext.Provider
       value={{
         isAuthenticated,
+        isHydrated,
         currentOb,
         loginOb,
         logoutOb,

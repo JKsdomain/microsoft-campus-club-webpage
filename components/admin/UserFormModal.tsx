@@ -40,8 +40,10 @@ export const UserFormModal: React.FC<UserFormModalProps> = ({
   const [department, setDepartment] = useState(DEPARTMENTS[0]);
   const [responsibility, setResponsibility] = useState(RESPONSIBILITIES[0]);
   const [status, setStatus] = useState<"Active" | "Inactive">("Active");
+  const [isSubmitting, setIsSubmitting] = useState(false);
 
   useEffect(() => {
+    setIsSubmitting(false);
     if (initialData) {
       setName(initialData.name);
       setEmail(initialData.email);
@@ -58,8 +60,6 @@ export const UserFormModal: React.FC<UserFormModalProps> = ({
   }, [initialData, isOpen]);
 
   if (!isOpen) return null;
-
-  const [isSubmitting, setIsSubmitting] = useState(false);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
