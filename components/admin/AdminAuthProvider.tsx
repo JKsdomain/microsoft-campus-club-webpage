@@ -39,8 +39,8 @@ interface AdminAuthContextType {
   rejectProposal: (id: string) => void;
 
   announcements: Announcement[];
-  addAnnouncement: (text: string) => void;
-  updateAnnouncement: (id: string, text: string) => void;
+  addAnnouncement: (text: string, payload?: { title?: string; poster?: any; isPinned?: boolean; status?: string }) => void;
+  updateAnnouncement: (id: string, text: string, payload?: { title?: string; poster?: any; isPinned?: boolean; status?: string }) => void;
   deleteAnnouncement: (id: string) => void;
   togglePublishAnnouncement: (id: string) => void;
   publishedAnnouncement: Announcement | null;
@@ -309,44 +309,156 @@ export const AdminAuthProvider: React.FC<{ children: React.ReactNode }> = ({ chi
   };
 
   // Announcement Management
-  const addAnnouncement = (text: string) => {
+  const addAnnouncement = async (
+    text: string,
+    payload?: { title?: string; poster?: any; isPinned?: boolean; status?: string }
+  ) => {
+    try {
+      const res = await fetch("/api/admin/announcements", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          title: payload?.title || "MCC Event Notice",
+          text,
+          description: text,
+          poster: payload?.poster || null,
+          isPinned: Boolean(payload?.isPinned),
+          status: payload?.status || "PUBLISHED",
+        }),
+      });
+      if (res.ok) {
+        const data = await res.json();
+        if (data.announcement) {
+          // If newly created announcement is pinned, unpin all local ones
+          const formatted = {
+            id: data.announcement.id,
+            title: data.announcement.title,
+            text: data.announcement.text,
+            description: data.announcement.description,
+            poster: data.announcement.poster,
+            isPinned: data.announcement.isPinned,
+            published: data.announcement.isPublished,
+            status: data.announcement.status,
+            createdAt: data.announcement.publishedDate,
+          };
+          setAnnouncements((prev) => {
+            const list = payload?.isPinned ? prev.map((a) => ({ ...a, isPinned: false })) : prev;
+            return [formatted, ...list.filter((a) => a.id !== formatted.id)];
+          });
+          addAuditLog(`Created Announcement (${formatted.title})`, "Announcements", "Success");
+          return;
+        }
+      }
+    } catch (e) {
+      console.error("MongoDB Atlas announcement create error:", e);
+    }
+
+    // Local fallback
     const newAnn: Announcement = {
       id: `ann-${Date.now()}`,
+      title: payload?.title || "MCC Event Notice",
       text,
-      published: true, // Auto publish new announcement
-      createdAt: new Date().toISOString().replace("T", " ").substring(0, 16),
-      updatedAt: new Date().toISOString().replace("T", " ").substring(0, 16),
+      description: text,
+      poster: payload?.poster || null,
+      isPinned: Boolean(payload?.isPinned),
+      published: true,
+      status: payload?.status as any || "PUBLISHED",
+      createdAt: new Date().toISOString().replace("T", " ").substring(0, 10),
     };
     saveAnnouncements([newAnn, ...announcements]);
-    addAuditLog("Created & Published Announcement", "Announcements", "Success");
+    addAuditLog("Created Announcement", "Announcements", "Success");
   };
 
-  const updateAnnouncement = (id: string, text: string) => {
+  const updateAnnouncement = async (
+    id: string,
+    text: string,
+    payload?: { title?: string; poster?: any; isPinned?: boolean; status?: string }
+  ) => {
+    try {
+      const res = await fetch("/api/admin/announcements", {
+        method: "PUT",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          id,
+          title: payload?.title,
+          text,
+          description: text,
+          poster: payload?.poster,
+          isPinned: payload?.isPinned,
+          status: payload?.status,
+        }),
+      });
+      if (res.ok) {
+        const data = await res.json();
+        if (data.announcement) {
+          const updatedDoc = data.announcement;
+          setAnnouncements((prev) =>
+            prev.map((a) => {
+              if (a.id === id) {
+                return {
+                  ...a,
+                  title: updatedDoc.title,
+                  text: updatedDoc.text,
+                  description: updatedDoc.description,
+                  poster: updatedDoc.poster,
+                  isPinned: updatedDoc.isPinned,
+                  published: updatedDoc.isPublished,
+                  status: updatedDoc.status,
+                };
+              }
+              if (payload?.isPinned && a.id !== id) {
+                return { ...a, isPinned: false };
+              }
+              return a;
+            })
+          );
+          addAuditLog(`Updated Announcement (${id})`, "Announcements", "Success");
+          return;
+        }
+      }
+    } catch (e) {
+      console.error("MongoDB Atlas announcement update error:", e);
+    }
+
     const updated = announcements.map((a) =>
       a.id === id
         ? {
             ...a,
             text,
-            updatedAt: new Date().toISOString().replace("T", " ").substring(0, 16),
+            title: payload?.title || a.title,
+            poster: payload?.poster !== undefined ? payload.poster : a.poster,
+            isPinned: payload?.isPinned !== undefined ? payload.isPinned : a.isPinned,
+            status: (payload?.status as any) || a.status,
           }
+        : payload?.isPinned
+        ? { ...a, isPinned: false }
         : a
     );
     saveAnnouncements(updated);
     addAuditLog(`Updated Announcement (${id})`, "Announcements", "Success");
   };
 
-  const deleteAnnouncement = (id: string) => {
+  const deleteAnnouncement = async (id: string) => {
+    try {
+      await fetch(`/api/admin/announcements?id=${id}`, { method: "DELETE" });
+    } catch (e) {
+      console.error("MongoDB Atlas announcement delete error:", e);
+    }
     const filtered = announcements.filter((a) => a.id !== id);
     saveAnnouncements(filtered);
     addAuditLog(`Deleted Announcement (${id})`, "Announcements", "Warning");
   };
 
-  const togglePublishAnnouncement = (id: string) => {
-    const updated = announcements.map((a) =>
-      a.id === id ? { ...a, published: !a.published } : a
-    );
-    saveAnnouncements(updated);
-    addAuditLog(`Toggled Announcement Publish State`, "Announcements", "Success");
+  const togglePublishAnnouncement = async (id: string) => {
+    const target = announcements.find((a) => a.id === id);
+    if (!target) return;
+    const newPublished = !target.published;
+    await updateAnnouncement(id, target.text, {
+      title: target.title,
+      poster: target.poster,
+      isPinned: target.isPinned,
+      status: newPublished ? "PUBLISHED" : "DRAFT",
+    });
   };
 
   const publishedAnnouncement = announcements.find((a) => a.published) || null;

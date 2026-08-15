@@ -27,12 +27,23 @@ export interface Proposal {
   details: string;
 }
 
+export interface AnnouncementPoster {
+  url: string;
+  publicId?: string;
+  type?: string;
+}
+
 export interface Announcement {
   id: string;
+  title?: string;
   text: string;
+  description?: string;
+  poster?: AnnouncementPoster | null;
+  isPinned?: boolean;
   published: boolean;
+  status?: "DRAFT" | "PUBLISHED" | "ARCHIVED";
   createdAt: string;
-  updatedAt: string;
+  updatedAt?: string;
 }
 
 export interface AuditLog {

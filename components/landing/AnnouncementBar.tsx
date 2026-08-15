@@ -3,36 +3,57 @@
 import React, { useState, useEffect } from "react";
 import Link from "next/link";
 import { Megaphone, X, ArrowRight } from "lucide-react";
-import { INITIAL_ANNOUNCEMENTS, Announcement } from "@/lib/adminState";
+import { Announcement } from "@/lib/adminState";
 
 export const AnnouncementBar: React.FC = () => {
-  const [publishedText, setPublishedText] = useState<string | null>(null);
+  const [latestNotice, setLatestNotice] = useState<{ title: string; text: string } | null>(null);
   const [dismissed, setDismissed] = useState(false);
 
   useEffect(() => {
-    try {
-      const stored = localStorage.getItem("mcc_announcements");
-      if (stored) {
-        const parsed: Announcement[] = JSON.parse(stored);
-        const publishedList = parsed.filter((a) => a.published);
-        if (publishedList.length > 0) {
-          publishedList.sort(
-            (a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime()
-          );
-          setPublishedText(publishedList[0].text);
-          return;
+    async function loadLatestAnnouncement() {
+      try {
+        const res = await fetch("/api/admin/announcements");
+        if (res.ok) {
+          const data = await res.json();
+          if (Array.isArray(data.announcements) && data.announcements.length > 0) {
+            const active = data.announcements.filter((a: any) => a.isPublished || a.status === "PUBLISHED");
+            const pinned = active.find((a: any) => a.isPinned) || active[0];
+            if (pinned) {
+              setLatestNotice({
+                title: pinned.title || "Weekly MCC Event",
+                text: pinned.text || pinned.description || "",
+              });
+              return;
+            }
+          }
         }
+      } catch (e) {
+        console.error("Failed to fetch latest announcement in AnnouncementBar", e);
       }
-    } catch (e) {
-      console.error("Failed to read announcements in AnnouncementBar", e);
+
+      // Local storage fallback
+      try {
+        const stored = localStorage.getItem("mcc_announcements");
+        if (stored) {
+          const parsed: Announcement[] = JSON.parse(stored);
+          const active = parsed.filter((a) => a.published);
+          const pinned = active.find((a) => a.isPinned) || active[0];
+          if (pinned) {
+            setLatestNotice({
+              title: pinned.title || "Weekly MCC Event",
+              text: pinned.text || pinned.description || "",
+            });
+          }
+        }
+      } catch (e) {
+        console.error("Failed to read announcements in AnnouncementBar", e);
+      }
     }
-    const pub = INITIAL_ANNOUNCEMENTS.find((a) => a.published);
-    if (pub) {
-      setPublishedText(pub.text);
-    }
+
+    loadLatestAnnouncement();
   }, []);
 
-  if (!publishedText || dismissed) return null;
+  if (!latestNotice || dismissed) return null;
 
   return (
     <div className="w-full bg-[#0078D4]/15 border-b border-[#0078D4]/30 px-4 py-2.5 text-xs text-[#F8FAFC]">
@@ -45,16 +66,17 @@ export const AnnouncementBar: React.FC = () => {
             <Megaphone className="w-3.5 h-3.5" />
           </div>
           <p className="truncate font-medium flex-1 min-w-0">
-            <span className="font-semibold text-[#22D3EE] mr-1.5 uppercase tracking-wide">
-              Announcement:
+            <span className="font-bold text-[#0078D4] mr-2 uppercase tracking-wide">
+              📢 THIS WEEK AT MCC:
             </span>
-            {publishedText}
+            <span className="font-semibold text-[#F8FAFC] mr-1.5">{latestNotice.title}</span>
+            <span className="text-[#CBD5E1] hidden md:inline">— {latestNotice.text}</span>
           </p>
-          <span className="hidden sm:inline-flex items-center gap-1 text-[#22D3EE] font-semibold hover:underline flex-shrink-0 text-xs">
-            View all
-            <ArrowRight className="w-3 h-3 group-hover:translate-x-0.5 transition-transform" />
+          <span className="inline-flex items-center gap-1 text-[#0078D4] font-semibold hover:underline flex-shrink-0 text-xs">
+            View Notice &rarr;
           </span>
         </Link>
+
         <button
           onClick={() => setDismissed(true)}
           className="p-1 rounded text-[#94A3B8] hover:text-white hover:bg-white/10 flex-shrink-0"

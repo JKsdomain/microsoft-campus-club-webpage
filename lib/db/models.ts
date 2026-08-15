@@ -48,15 +48,22 @@ const OfficeBearerSchema = new Schema(
 // 4. ANNOUNCEMENTS
 const AnnouncementSchema = new Schema(
   {
+    title: { type: String, default: "" },
     content: { type: String, required: true },
+    poster: {
+      url: { type: String, default: null },
+      publicId: { type: String, default: null },
+      type: { type: String, default: "IMAGE" },
+    },
+    isPinned: { type: Boolean, default: false, index: true },
     status: {
       type: String,
       enum: ["DRAFT", "PUBLISHED", "ARCHIVED"],
-      default: "DRAFT",
+      default: "PUBLISHED",
       index: true,
     },
-    publishedAt: { type: Date, default: null, index: true },
-    createdBy: { type: Schema.Types.ObjectId, ref: "admins", required: true },
+    publishedAt: { type: Date, default: Date.now, index: true },
+    createdBy: { type: Schema.Types.ObjectId, ref: "admins", default: null },
     updatedBy: { type: Schema.Types.ObjectId, ref: "admins", default: null },
   },
   { timestamps: true }
