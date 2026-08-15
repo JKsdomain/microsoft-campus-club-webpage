@@ -75,7 +75,7 @@ export const LoginModal: React.FC<LoginModalProps> = ({
       aria-describedby="modal-description"
       onKeyDown={handleKeyDown}
     >
-      <div className="w-full max-w-[420px] rounded-2xl bg-[#0D1B2A] border border-white/15 p-6 sm:p-8 text-center shadow-2xl shadow-black/80 relative animate-fade-in">
+      <div className="w-full max-w-[420px] rounded-2xl bg-[#0D1B2A] border border-white/15 p-6 sm:p-8 text-center shadow-2xl shadow-black/80 relative animate-fade-in max-h-[90vh] overflow-y-auto">
         {/* Icon Circle */}
         <div
           className={`w-16 h-16 rounded-full border flex items-center justify-center mx-auto mb-4 ${config.iconBg}`}

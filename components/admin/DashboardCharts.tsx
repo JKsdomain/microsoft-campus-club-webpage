@@ -25,10 +25,11 @@ export const DashboardCharts: React.FC = () => {
   };
 
   officeBearers.forEach((ob) => {
-    if (ob.department.includes("Computer Science")) deptCounts["CSE"]++;
-    else if (ob.department.includes("Information")) deptCounts["IT"]++;
-    else if (ob.department.includes("Electronics &")) deptCounts["ECE"]++;
-    else if (ob.department.includes("Electrical")) deptCounts["EEE"]++;
+    const dept = ob && ob.department ? String(ob.department) : "";
+    if (dept.includes("Computer Science")) deptCounts["CSE"]++;
+    else if (dept.includes("Information")) deptCounts["IT"]++;
+    else if (dept.includes("Electronics &")) deptCounts["ECE"]++;
+    else if (dept.includes("Electrical")) deptCounts["EEE"]++;
     else deptCounts["Other"]++;
   });
 

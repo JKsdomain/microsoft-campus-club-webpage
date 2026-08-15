@@ -223,8 +223,8 @@ export const UserManagementTable: React.FC = () => {
 
       {/* Delete / Deactivate Confirmation Dialog */}
       {confirmDeleteId && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/70 backdrop-blur-md animate-fade-in">
-          <div className="w-full max-w-md rounded-2xl bg-[#0D1B2A] border border-white/15 p-6 text-center shadow-2xl space-y-4">
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 pt-16 sm:pt-20 bg-black/70 backdrop-blur-md animate-fade-in">
+          <div className="w-full max-w-md rounded-2xl bg-[#0D1B2A] border border-white/15 p-6 text-center shadow-2xl space-y-4 max-h-[90vh] overflow-y-auto">
             <div className="w-12 h-12 rounded-full bg-red-500/10 border border-red-500/30 flex items-center justify-center mx-auto text-red-400">
               <AlertTriangle className="w-6 h-6" />
             </div>

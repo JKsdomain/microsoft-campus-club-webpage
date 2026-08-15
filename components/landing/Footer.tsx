@@ -11,12 +11,11 @@ export const Footer: React.FC = () => {
           {/* Brand Column (5 cols) */}
           <div className="md:col-span-6 lg:col-span-5 space-y-4">
             <Link href="/" className="inline-flex items-center gap-3 group">
-              <div className="grid grid-cols-2 gap-0.5 w-6 h-6 p-0.5 rounded bg-white/5 border border-white/10">
-                <span className="bg-[#F25022] rounded-[1px]" />
-                <span className="bg-[#7FBA00] rounded-[1px]" />
-                <span className="bg-[#00A4EF] rounded-[1px]" />
-                <span className="bg-[#FFB900] rounded-[1px]" />
-              </div>
+              <img
+                src="/images/mcc-logo.jpeg"
+                alt="MCC — Microsoft Campus Club"
+                className="h-9 w-auto object-contain rounded-lg"
+              />
               <div className="flex flex-col">
                 <span className="font-bold text-lg text-[#F8FAFC]">MCC</span>
                 <span className="text-xs text-[#94A3B8] font-medium uppercase tracking-wider">

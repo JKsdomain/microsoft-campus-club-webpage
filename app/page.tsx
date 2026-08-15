@@ -2,6 +2,7 @@ import { Navbar } from "@/components/landing/Navbar";
 import { AnnouncementBar } from "@/components/landing/AnnouncementBar";
 import { Hero } from "@/components/landing/Hero";
 import { AboutMCC } from "@/components/landing/AboutMCC";
+import { MissionVision } from "@/components/landing/MissionVision";
 import { StorySections } from "@/components/landing/StorySections";
 import { PlatformSection } from "@/components/landing/PlatformSection";
 import { Footer } from "@/components/landing/Footer";
@@ -22,6 +23,9 @@ export default function Home() {
 
         {/* 3. About MCC */}
         <AboutMCC />
+
+        {/* Mission & Vision Section */}
+        <MissionVision />
 
         {/* 4, 5, 6, 7. Story Sections (IGNITE, INNOVATE, IMPACT, CONNECT) */}
         <StorySections />

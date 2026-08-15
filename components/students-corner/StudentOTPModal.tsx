@@ -106,7 +106,7 @@ export const StudentOTPModal: React.FC<StudentOTPModalProps> = ({
       />
 
       {/* Modal Container */}
-      <div className="relative z-10 w-full max-w-md rounded-2xl bg-[#0D1B2A] border border-white/15 shadow-2xl p-6 sm:p-8 space-y-6 text-[#F8FAFC]">
+      <div className="relative z-10 w-full max-w-md rounded-2xl bg-[#0D1B2A] border border-white/15 shadow-2xl p-6 sm:p-8 space-y-6 text-[#F8FAFC] max-h-[90vh] overflow-y-auto">
         <button
           onClick={onClose}
           className="absolute top-4 right-4 p-1.5 rounded-lg text-[#94A3B8] hover:text-white hover:bg-white/10"

@@ -51,15 +51,13 @@ export const Navbar: React.FC = () => {
             href="/"
             className="flex items-center gap-3 group focus:outline-none focus-visible:ring-2 focus-visible:ring-[#0078D4] rounded-md"
           >
-            {/* Microsoft 4-color Quad Icon */}
-            <div className="grid grid-cols-2 gap-0.5 w-6 h-6 p-0.5 rounded bg-white/5 border border-white/10 group-hover:border-[#0078D4]/50 transition-colors">
-              <span className="bg-[#F25022] rounded-[1px]" />
-              <span className="bg-[#7FBA00] rounded-[1px]" />
-              <span className="bg-[#00A4EF] rounded-[1px]" />
-              <span className="bg-[#FFB900] rounded-[1px]" />
-            </div>
+            <img
+              src="/images/mcc-logo.jpeg"
+              alt="MCC — Microsoft Campus Club"
+              className="h-9 sm:h-10 w-auto object-contain rounded-lg"
+            />
             <div className="flex flex-col">
-              <span className="font-bold text-lg tracking-tight text-[#F8FAFC] leading-none group-hover:text-white">
+              <span className="font-bold text-base sm:text-lg tracking-tight text-[#F8FAFC] leading-none group-hover:text-white">
                 MCC
               </span>
               <span className="text-[10px] font-medium text-[#94A3B8] tracking-wider uppercase leading-tight mt-0.5">

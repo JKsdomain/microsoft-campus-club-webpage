@@ -68,6 +68,20 @@ export const AdminAuthProvider: React.FC<{ children: React.ReactNode }> = ({ chi
   const [auditLogs, setAuditLogs] = useState<AuditLog[]>(INITIAL_AUDIT_LOGS);
   const [activityAvailability, setActivityAvailability] = useState<ActivityAvailabilityMap>(INITIAL_ACTIVITY_AVAILABILITY);
 
+  const fetchUsersFromDb = async () => {
+    try {
+      const res = await fetch("/api/admin/users");
+      if (res.ok) {
+        const data = await res.json();
+        if (Array.isArray(data.users)) {
+          setOfficeBearers(data.users);
+        }
+      }
+    } catch (err) {
+      console.error("Failed to fetch users from MongoDB Atlas:", err);
+    }
+  };
+
   // Sync state with localStorage and cookies if in browser environment
   useEffect(() => {
     const savedAuth = localStorage.getItem("mcc_admin_authenticated");
@@ -98,6 +112,9 @@ export const AdminAuthProvider: React.FC<{ children: React.ReactNode }> = ({ chi
       }
     }
     setIsHydrated(true);
+
+    // Fetch real MongoDB data
+    fetchUsersFromDb();
   }, []);
 
   const saveAnnouncements = (newAnnouncements: Announcement[]) => {
@@ -143,8 +160,27 @@ export const AdminAuthProvider: React.FC<{ children: React.ReactNode }> = ({ chi
     setAuditLogs((prev) => [newLog, ...prev]);
   };
 
-  // User Management CRUD
-  const addOfficeBearer = (obData: Omit<OfficeBearer, "id" | "joinedDate">) => {
+  // User Management MongoDB CRUD
+  const addOfficeBearer = async (obData: Omit<OfficeBearer, "id" | "joinedDate">) => {
+    try {
+      const res = await fetch("/api/admin/users", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(obData),
+      });
+      if (res.ok) {
+        const data = await res.json();
+        if (data.user) {
+          setOfficeBearers((prev) => [data.user, ...prev.filter((u) => u.id !== data.user.id)]);
+          addAuditLog(`Created Office Bearer (${data.user.name})`, "User Management", "Success");
+          return;
+        }
+      }
+    } catch (err) {
+      console.error("MongoDB Atlas creation error:", err);
+    }
+
+    // Fallback UI update
     const newOb: OfficeBearer = {
       ...obData,
       id: `ob-${Date.now()}`,
@@ -154,20 +190,52 @@ export const AdminAuthProvider: React.FC<{ children: React.ReactNode }> = ({ chi
     addAuditLog(`Created Office Bearer (${newOb.name})`, "User Management", "Success");
   };
 
-  const updateOfficeBearer = (id: string, updatedData: Partial<OfficeBearer>) => {
+  const updateOfficeBearer = async (id: string, updatedData: Partial<OfficeBearer>) => {
+    try {
+      const res = await fetch("/api/admin/users", {
+        method: "PUT",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ id, ...updatedData }),
+      });
+      if (res.ok) {
+        const data = await res.json();
+        if (data.user) {
+          setOfficeBearers((prev) => prev.map((ob) => (ob.id === id ? data.user : ob)));
+          addAuditLog(`Updated Office Bearer (${data.user.name})`, "User Management", "Success");
+          return;
+        }
+      }
+    } catch (err) {
+      console.error("MongoDB Atlas update error:", err);
+    }
+
     setOfficeBearers((prev) =>
       prev.map((ob) => (ob.id === id ? { ...ob, ...updatedData } : ob))
     );
     addAuditLog(`Updated Office Bearer (${id})`, "User Management", "Success");
   };
 
-  const deleteOfficeBearer = (id: string) => {
+  const deleteOfficeBearer = async (id: string) => {
+    try {
+      await fetch(`/api/admin/users?id=${encodeURIComponent(id)}`, { method: "DELETE" });
+    } catch (err) {
+      console.error("MongoDB Atlas delete error:", err);
+    }
     const target = officeBearers.find((ob) => ob.id === id);
     setOfficeBearers((prev) => prev.filter((ob) => ob.id !== id));
     addAuditLog(`Deactivated/Deleted Office Bearer (${target?.name || id})`, "User Management", "Warning");
   };
 
-  const changeObCredentials = (id: string) => {
+  const changeObCredentials = async (id: string) => {
+    try {
+      await fetch("/api/admin/users", {
+        method: "PUT",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ id, newPassword: "ob123_reset" }),
+      });
+    } catch (err) {
+      console.error("MongoDB Atlas credentials update error:", err);
+    }
     const target = officeBearers.find((ob) => ob.id === id);
     addAuditLog(`Changed Credentials for (${target?.name || id})`, "User Management", "Warning");
   };
