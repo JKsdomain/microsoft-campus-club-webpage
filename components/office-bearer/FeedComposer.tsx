@@ -5,7 +5,6 @@ import { Send, Sparkles, CheckCircle2, Clock, Image, Video, UploadCloud, AlertCi
 import { useOBAuth } from "./OBAuthProvider";
 import { UnauthorizedGuard } from "./UnauthorizedGuard";
 import { Button } from "../ui/Button";
-import { uploadToCloudinary } from "@/lib/cloudinary";
 
 export const FeedComposer: React.FC = () => {
   const { currentOb, hasResponsibility, submitFeedPost, feedPosts } = useOBAuth();
@@ -27,11 +26,24 @@ export const FeedComposer: React.FC = () => {
 
     setIsUploadingMedia(true);
     try {
-      const res = await uploadToCloudinary(file);
-      setMediaType(res.resource_type);
-      setMediaUrl(res.secure_url);
-    } catch {
-      alert("Failed to upload media to Cloudinary.");
+      const formData = new FormData();
+      formData.append("media", file);
+
+      const res = await fetch("/api/office-bearer/feed/upload", {
+        method: "POST",
+        body: formData,
+      });
+
+      if (!res.ok) {
+        const errorData = await res.json().catch(() => ({}));
+        throw new Error(errorData.message || "Unable to upload the media. Please try again.");
+      }
+
+      const data = await res.json();
+      setMediaType(data.type === "VIDEO" ? "video" : "image");
+      setMediaUrl(data.url);
+    } catch (err: any) {
+      alert(err.message || "Unable to upload media to Cloudinary. Please try again.");
     } finally {
       setIsUploadingMedia(false);
     }
