@@ -22,11 +22,13 @@ import { PlacementTestRunner } from "@/components/students-corner/PlacementTestR
 import { QuizTestRunner } from "@/components/students-corner/QuizTestRunner";
 import { WeeklyLeaderboard } from "@/components/students-corner/WeeklyLeaderboard";
 import { HistoryQuestions } from "@/components/students-corner/HistoryQuestions";
+import { MembershipForm } from "@/components/students-corner/MembershipForm";
 import { FeedList } from "@/components/office-bearer/FeedCard";
 import { OBAuthProvider, useOBAuth } from "@/components/office-bearer/OBAuthProvider";
 import { Button } from "@/components/ui/Button";
 import { StudentResultReport, ACTIVE_PLACEMENT_SET, ACTIVE_QUIZ_SET } from "@/lib/studentState";
 import { ActivityAvailabilityMap, INITIAL_ACTIVITY_AVAILABILITY } from "@/lib/adminState";
+import { FileText } from "lucide-react";
 
 type TabType =
   | "overview"
@@ -35,7 +37,8 @@ type TabType =
   | "technical-games"
   | "feed"
   | "history"
-  | "leaderboard";
+  | "leaderboard"
+  | "membership";
 
 function StudentsCornerInner() {
   const { publishedFeedPosts } = useOBAuth();
@@ -106,6 +109,7 @@ function StudentsCornerInner() {
     { id: "feed", label: "Feed", icon: Rss },
     { id: "history", label: "History Questions", icon: History },
     { id: "leaderboard", label: "Weekly Leaderboard", icon: Trophy },
+    { id: "membership", label: "Membership Form", icon: FileText },
   ];
 
   return (
@@ -471,6 +475,9 @@ function StudentsCornerInner() {
         {activeTab === "leaderboard" && (
           <WeeklyLeaderboard isPublished={leaderboardPublished} />
         )}
+
+        {/* TAB 8: MEMBERSHIP FORM */}
+        {activeTab === "membership" && <MembershipForm />}
       </main>
 
       {/* Test Information & Rules Preview Modal */}
