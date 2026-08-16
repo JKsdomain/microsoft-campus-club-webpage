@@ -32,9 +32,9 @@ export const OBSidebar: React.FC<OBSidebarProps> = ({
   const router = useRouter();
   const { currentOb, logoutOb, switchObPersona } = useOBAuth();
 
-  const handleLogout = () => {
-    logoutOb();
-    router.push("/office-bearer/login");
+  const handleLogout = async () => {
+    await logoutOb();
+    router.replace("/");
   };
 
   // Map of activity names to route metadata

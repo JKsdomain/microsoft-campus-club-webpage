@@ -59,14 +59,20 @@ function StudentsCornerInner() {
   const [testInfoPreviewOpen, setTestInfoPreviewOpen] = useState(false);
 
   React.useEffect(() => {
-    try {
-      const stored = localStorage.getItem("mcc_activity_availability");
-      if (stored) {
-        setActivityAvailability(JSON.parse(stored));
+    const fetchAvailability = async () => {
+      try {
+        const res = await fetch("/api/admin/activity-availability");
+        if (res.ok) {
+          const data = await res.json();
+          if (data.activityAvailability) {
+            setActivityAvailability(data.activityAvailability);
+          }
+        }
+      } catch (e) {
+        console.error("Failed to fetch activity availability", e);
       }
-    } catch (e) {
-      console.error("Failed to read activity availability", e);
-    }
+    };
+    fetchAvailability();
   }, []);
 
   const handleStartTestFlow = (testType: "Placement Questions" | "General Quiz") => {

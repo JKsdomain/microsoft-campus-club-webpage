@@ -31,17 +31,7 @@ export default function AnnouncementsPage() {
         console.error("Failed to fetch MongoDB announcements:", e);
       }
 
-      // LocalStorage fallback
-      try {
-        const stored = localStorage.getItem("mcc_announcements");
-        if (stored) {
-          const parsed: Announcement[] = JSON.parse(stored);
-          const activeOnly = parsed.filter((a) => a.published);
-          setAnnouncements(activeOnly);
-        }
-      } catch (e) {
-        console.error("Error reading announcements from localStorage:", e);
-      }
+
       setLoaded(true);
     }
 

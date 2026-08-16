@@ -82,45 +82,92 @@ export const AdminAuthProvider: React.FC<{ children: React.ReactNode }> = ({ chi
     }
   };
 
-  // Sync state with localStorage and cookies if in browser environment
+  // Sync state with server session authority
   useEffect(() => {
-    const savedAuth = localStorage.getItem("mcc_admin_authenticated");
-    const hasCookie = typeof document !== "undefined" && document.cookie.includes("mcc_admin_session");
-    if (savedAuth === "true" || hasCookie) {
-      setIsAuthenticated(true);
-    } else {
-      setIsAuthenticated(false);
-    }
-    const savedEmail = localStorage.getItem("mcc_admin_email");
-    if (savedEmail) {
-      setAdminEmail(savedEmail);
-    }
-    const savedAnnouncements = localStorage.getItem("mcc_announcements");
-    if (savedAnnouncements) {
+    const syncWithServer = async () => {
       try {
-        setAnnouncements(JSON.parse(savedAnnouncements));
-      } catch (e) {
-        console.error("Failed to parse saved announcements", e);
+        const res = await fetch("/api/auth/session");
+        if (res.ok) {
+          const data = await res.json();
+          if (data.authenticated && data.role === "ADMIN") {
+            setIsAuthenticated(true);
+            if (data.email) setAdminEmail(data.email);
+          } else {
+            setIsAuthenticated(false);
+          }
+        } else {
+          setIsAuthenticated(false);
+        }
+      } catch (err) {
+        console.error("Session verification error:", err);
+        // Fallback removed: rely on server session; assume unauthenticated on error
+        setIsAuthenticated(false);
+      } finally {
+        setIsHydrated(true);
       }
-    }
-    const savedAvailability = localStorage.getItem("mcc_activity_availability");
-    if (savedAvailability) {
-      try {
-        setActivityAvailability(JSON.parse(savedAvailability));
-      } catch (e) {
-        console.error("Failed to parse activity availability", e);
-      }
-    }
-    setIsHydrated(true);
+    };
 
-    // Fetch real MongoDB data
+    // Load announcements from DB
+    const fetchAnnouncements = async () => {
+      try {
+        const annRes = await fetch("/api/admin/announcements");
+        if (annRes.ok) {
+          const annData = await annRes.json();
+          if (Array.isArray(annData.announcements)) {
+            setAnnouncements(annData.announcements);
+          }
+        }
+      } catch (e) {
+        console.error("Failed to fetch announcements from API", e);
+      }
+    };
+
+    // Load activity availability from DB (SystemSetting)
+    const fetchAvailability = async () => {
+      try {
+        const availRes = await fetch("/api/admin/activity-availability");
+        if (availRes.ok) {
+          const availData = await availRes.json();
+          if (availData.activityAvailability) {
+            setActivityAvailability(availData.activityAvailability);
+          }
+        }
+      } catch (e) {
+        console.error("Failed to fetch activity availability", e);
+      }
+    };
+
+    // Load assignments from MongoDB (Responsibilities + assigned OBs)
+    const fetchAssignments = async () => {
+      try {
+        const assignRes = await fetch("/api/admin/assignments");
+        if (assignRes.ok) {
+          const assignData = await assignRes.json();
+          if (Array.isArray(assignData.assignments) && assignData.assignments.length > 0) {
+            setAssignments(assignData.assignments);
+          }
+        }
+      } catch (e) {
+        console.error("Failed to fetch assignments from MongoDB", e);
+      }
+    };
+
+    // Call async functions
+    syncWithServer();
     fetchUsersFromDb();
+    fetchAnnouncements();
+    fetchAvailability();
+    fetchAssignments();
   }, []);
 
-  const saveAnnouncements = (newAnnouncements: Announcement[]) => {
+  const saveAnnouncements = async (newAnnouncements: Announcement[]) => {
     setAnnouncements(newAnnouncements);
     try {
-      localStorage.setItem("mcc_announcements", JSON.stringify(newAnnouncements));
+      await fetch("/api/admin/announcements", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ announcements: newAnnouncements }),
+      });
     } catch (e) {
       console.error("Failed to save announcements", e);
     }
@@ -129,21 +176,29 @@ export const AdminAuthProvider: React.FC<{ children: React.ReactNode }> = ({ chi
   const loginAdmin = (email: string) => {
     setIsAuthenticated(true);
     setAdminEmail(email);
-    localStorage.setItem("mcc_admin_authenticated", "true");
-    localStorage.setItem("mcc_admin_email", email);
-    if (typeof document !== "undefined") {
-      document.cookie = `mcc_admin_session=${encodeURIComponent(email)}; path=/; max-age=86400; SameSite=Lax`;
-    }
+    // LocalStorage persistence removed; session handled server‑side
+
+    // Purge any stale OB storage keys
+    localStorage.removeItem("mcc_ob_authenticated");
+    localStorage.removeItem("mcc_ob_email");
+    localStorage.removeItem("mcc_ob_name");
+    localStorage.removeItem("mcc_ob_dept");
+    localStorage.removeItem("mcc_ob_resp");
+
     addAuditLog("Admin Login", "Authentication", "Success");
   };
 
-  const logoutAdmin = () => {
+  const logoutAdmin = async () => {
     setIsAuthenticated(false);
     localStorage.removeItem("mcc_admin_authenticated");
     localStorage.removeItem("mcc_admin_email");
-    if (typeof document !== "undefined") {
-      document.cookie = "mcc_admin_session=; path=/; expires=Thu, 01 Jan 1970 00:00:00 GMT";
+
+    try {
+      await fetch("/api/auth/logout", { method: "POST" });
+    } catch (err) {
+      console.error("Logout API call error:", err);
     }
+
     addAuditLog("Admin Logout", "Authentication", "Success");
   };
 
@@ -240,8 +295,8 @@ export const AdminAuthProvider: React.FC<{ children: React.ReactNode }> = ({ chi
     addAuditLog(`Changed Credentials for (${target?.name || id})`, "User Management", "Warning");
   };
 
-  // Responsibility Assignment: STRICT 1 OB -> 1 RESPONSIBILITY
-  const assignObToActivity = (activityId: string, obId: string) => {
+  // Responsibility Assignment: STRICT 1 OB -> 1 RESPONSIBILITY (MongoDB-persisted)
+  const assignObToActivity = async (activityId: string, obId: string) => {
     const targetActivity = assignments.find((a) => a.id === activityId);
     const selectedOb = officeBearers.find((ob) => ob.id === obId);
 
@@ -249,46 +304,34 @@ export const AdminAuthProvider: React.FC<{ children: React.ReactNode }> = ({ chi
 
     const activityName = targetActivity.activityName;
 
-    // 1. Update officeBearers list: clear selectedOb's old responsibility, set new responsibility
-    setOfficeBearers((prev) =>
-      prev.map((ob) => {
-        if (ob.id === obId) {
-          return { ...ob, responsibility: activityName };
-        }
-        // If another OB had this activity, clear their responsibility
-        if (ob.responsibility === activityName) {
-          return { ...ob, responsibility: "Unassigned" };
-        }
-        return ob;
-      })
-    );
+    try {
+      const res = await fetch("/api/admin/assignments", {
+        method: "PUT",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ activityId, obId }),
+      });
 
-    // 2. Update assignments list: clear any other activity currently assigned to selectedOb
-    setAssignments((prev) =>
-      prev.map((act) => {
-        if (act.id === activityId) {
-          return {
-            ...act,
-            assignedObId: selectedOb.id,
-            assignedObName: selectedOb.name,
-            department: selectedOb.department,
-            assignmentStatus: "Assigned",
-          };
+      if (res.ok) {
+        const data = await res.json();
+        // Update assignments from server response (source of truth)
+        if (Array.isArray(data.assignments)) {
+          setAssignments(data.assignments);
         }
-        if (act.assignedObId === obId) {
-          return {
-            ...act,
-            assignedObId: null,
-            assignedObName: null,
-            department: null,
-            assignmentStatus: "Unassigned",
-          };
+        // Update OBs from server response (source of truth)
+        if (Array.isArray(data.users)) {
+          setOfficeBearers(data.users);
         }
-        return act;
-      })
-    );
-
-    addAuditLog(`Assigned ${selectedOb.name} to strictly manage ${activityName}`, "Responsibility Management", "Success");
+        addAuditLog(`Assigned ${selectedOb.name} to strictly manage ${activityName}`, "Responsibility Management", "Success");
+        console.log(`✅ [MONGODB] Assignment persisted: ${selectedOb.name} → ${activityName}`);
+      } else {
+        const errData = await res.json().catch(() => ({}));
+        console.error("❌ Assignment API error:", errData.message || res.statusText);
+        addAuditLog(`Failed to assign ${selectedOb.name} to ${activityName}`, "Responsibility Management", "Failure");
+      }
+    } catch (err) {
+      console.error("❌ Assignment network error:", err);
+      addAuditLog(`Failed to assign ${selectedOb.name} to ${activityName} (network error)`, "Responsibility Management", "Failure");
+    }
   };
 
   // Proposal Workflow
@@ -493,11 +536,7 @@ export const AdminAuthProvider: React.FC<{ children: React.ReactNode }> = ({ chi
       [activityName]: status,
     };
     setActivityAvailability(updated);
-    try {
-      localStorage.setItem("mcc_activity_availability", JSON.stringify(updated));
-    } catch (e) {
-      console.error("Failed to save activity availability", e);
-    }
+        // Local storage fallback removed; activity availability persisted via API
     addAuditLog(`Changed ${activityName} availability: ${oldStatus} → ${status}`, "Responsibilities", "Success");
   };
 

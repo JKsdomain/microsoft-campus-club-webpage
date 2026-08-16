@@ -15,9 +15,13 @@ function OBLayoutInner({ children }: { children: React.ReactNode }) {
   const isLoginPage = pathname === "/office-bearer/login";
 
   useEffect(() => {
-    // Auth Guard: If not on login page and not authenticated after hydration, redirect to /office-bearer/login
-    if (isHydrated && !isLoginPage && !isAuthenticated) {
-      router.push("/office-bearer/login");
+    // Auth Guard: Direct authenticated users away from login page to dashboard, and unauthenticated users away from protected pages
+    if (isHydrated) {
+      if (!isLoginPage && !isAuthenticated) {
+        router.push("/office-bearer/login");
+      } else if (isLoginPage && isAuthenticated) {
+        router.push("/office-bearer/dashboard");
+      }
     }
   }, [isAuthenticated, isHydrated, isLoginPage, router]);
 

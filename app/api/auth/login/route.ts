@@ -17,6 +17,18 @@ export async function POST(req: Request) {
     const cleanEmail = String(email).trim().toLowerCase();
     console.log(`🔐 [AUTH API] Processing ${role.toUpperCase()} login attempt for: ${cleanEmail}`);
 
+    // Helper to set Admin session and clear OB session
+    const setAdminSessionCookies = (res: NextResponse, emailStr: string) => {
+      res.cookies.set("mcc_admin_session", emailStr, { path: "/", httpOnly: true, sameSite: "lax", maxAge: 86400 });
+      res.cookies.set("mcc_ob_session", "", { path: "/", httpOnly: true, sameSite: "lax", maxAge: 0, expires: new Date(0) });
+    };
+
+    // Helper to set OB session and clear Admin session
+    const setObSessionCookies = (res: NextResponse, emailStr: string) => {
+      res.cookies.set("mcc_ob_session", emailStr, { path: "/", httpOnly: true, sameSite: "lax", maxAge: 86400 });
+      res.cookies.set("mcc_admin_session", "", { path: "/", httpOnly: true, sameSite: "lax", maxAge: 0, expires: new Date(0) });
+    };
+
     // 1. ADMIN AUTHENTICATION
     if (role === "admin") {
       try {
@@ -26,9 +38,9 @@ export async function POST(req: Request) {
           console.log(`✅ [AUTH API] Admin login verified from MongoDB for: ${cleanEmail}`);
           const res = NextResponse.json({
             message: "Admin authentication successful",
-            user: { id: adminDoc._id, name: adminDoc.name, email: adminDoc.email, role: "ADMIN" },
+            user: { id: String(adminDoc._id), name: adminDoc.name, email: adminDoc.email, role: "ADMIN" },
           });
-          res.cookies.set("mcc_admin_session", cleanEmail, { path: "/", httpOnly: false, sameSite: "lax", maxAge: 86400 });
+          setAdminSessionCookies(res, cleanEmail);
           return res;
         }
       } catch (dbErr: any) {
@@ -42,7 +54,7 @@ export async function POST(req: Request) {
           message: "Admin authentication successful",
           user: { name: "Administrator", email: "admin@mcc.edu", role: "ADMIN" },
         });
-        res.cookies.set("mcc_admin_session", cleanEmail, { path: "/", httpOnly: false, sameSite: "lax", maxAge: 86400 });
+        setAdminSessionCookies(res, cleanEmail);
         return res;
       }
 
@@ -70,11 +82,11 @@ export async function POST(req: Request) {
             name: obFound.name,
             email: obFound.email,
             department: obFound.department || "Computer Science",
-            responsibility: obFound.responsibilityId ? obFound.responsibilityId.name : "Unassigned",
+            responsibility: obFound.responsibilityId ? (obFound.responsibilityId as any).name : "Unassigned",
             role: "OFFICE_BEARER",
           },
         });
-        res.cookies.set("mcc_ob_session", cleanEmail, { path: "/", httpOnly: false, sameSite: "lax", maxAge: 86400 });
+        setObSessionCookies(res, cleanEmail);
         return res;
       }
 

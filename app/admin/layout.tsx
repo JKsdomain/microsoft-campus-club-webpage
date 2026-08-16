@@ -15,9 +15,13 @@ function AdminLayoutInner({ children }: { children: React.ReactNode }) {
   const isLoginPage = pathname === "/admin/login";
 
   useEffect(() => {
-    // Auth Guard: If not on login page and not authenticated after hydration, redirect to /admin/login
-    if (isHydrated && !isLoginPage && !isAuthenticated) {
-      router.push("/admin/login");
+    // Auth Guard: Direct authenticated users away from login page to dashboard, and unauthenticated users away from protected pages
+    if (isHydrated) {
+      if (!isLoginPage && !isAuthenticated) {
+        router.push("/admin/login");
+      } else if (isLoginPage && isAuthenticated) {
+        router.push("/admin/dashboard");
+      }
     }
   }, [isAuthenticated, isHydrated, isLoginPage, router]);
 

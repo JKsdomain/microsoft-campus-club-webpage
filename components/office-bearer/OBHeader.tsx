@@ -18,9 +18,9 @@ export const OBHeader: React.FC<OBHeaderProps> = ({
   const router = useRouter();
   const { currentOb, logoutOb } = useOBAuth();
 
-  const handleLogout = () => {
-    logoutOb();
-    router.push("/office-bearer/login");
+  const handleLogout = async () => {
+    await logoutOb();
+    router.replace("/");
   };
 
   return (

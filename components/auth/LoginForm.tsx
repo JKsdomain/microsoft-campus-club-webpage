@@ -4,6 +4,8 @@ import React, { useState } from "react";
 import { useRouter } from "next/navigation";
 import { Button } from "../ui/Button";
 import { LoginModal, ModalType } from "./LoginModal";
+import { useAdminAuth } from "../admin/AdminAuthProvider";
+import { useOBAuth } from "../office-bearer/OBAuthProvider";
 
 interface LoginFormProps {
   role: "admin" | "office-bearer";
@@ -24,6 +26,12 @@ export const LoginForm: React.FC<LoginFormProps> = ({
   const [modalType, setModalType] = useState<ModalType>(null);
   const router = useRouter();
 
+  // Optionally obtain auth context methods if rendered inside their providers
+  let adminAuth: ReturnType<typeof useAdminAuth> | null = null;
+  let obAuth: ReturnType<typeof useOBAuth> | null = null;
+  try { adminAuth = useAdminAuth(); } catch {}
+  try { obAuth = useOBAuth(); } catch {}
+
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!email || !password) return;
@@ -38,14 +46,22 @@ export const LoginForm: React.FC<LoginFormProps> = ({
       });
 
       if (response.ok) {
+        const data = await response.json().catch(() => ({}));
+        const cleanEmail = email.trim();
+
         if (role === "admin") {
-          localStorage.setItem("mcc_admin_authenticated", "true");
-          localStorage.setItem("mcc_admin_email", email.trim());
-          document.cookie = `mcc_admin_session=${encodeURIComponent(email.trim())}; path=/; max-age=86400; SameSite=Lax`;
+          if (adminAuth) {
+            adminAuth.loginAdmin(cleanEmail);
+          }
         } else {
-          localStorage.setItem("mcc_ob_authenticated", "true");
-          localStorage.setItem("mcc_ob_email", email.trim());
-          document.cookie = `mcc_ob_session=${encodeURIComponent(email.trim())}; path=/; max-age=86400; SameSite=Lax`;
+          if (obAuth) {
+            obAuth.loginOb(cleanEmail, data.user ? {
+              id: data.user.id,
+              name: data.user.name,
+              department: data.user.department,
+              assignedResponsibility: data.user.responsibility,
+            } : undefined);
+          }
         }
         setModalType("success");
       } else {

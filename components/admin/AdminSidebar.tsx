@@ -37,9 +37,9 @@ export const AdminSidebar: React.FC<AdminSidebarProps> = ({
   const router = useRouter();
   const { logoutAdmin } = useAdminAuth();
 
-  const handleLogout = () => {
-    logoutAdmin();
-    router.push("/admin/login");
+  const handleLogout = async () => {
+    await logoutAdmin();
+    router.replace("/");
   };
 
   const navContent = (

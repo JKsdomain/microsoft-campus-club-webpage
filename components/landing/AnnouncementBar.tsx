@@ -30,24 +30,6 @@ export const AnnouncementBar: React.FC = () => {
       } catch (e) {
         console.error("Failed to fetch latest announcement in AnnouncementBar", e);
       }
-
-      // Local storage fallback
-      try {
-        const stored = localStorage.getItem("mcc_announcements");
-        if (stored) {
-          const parsed: Announcement[] = JSON.parse(stored);
-          const active = parsed.filter((a) => a.published);
-          const pinned = active.find((a) => a.isPinned) || active[0];
-          if (pinned) {
-            setLatestNotice({
-              title: pinned.title || "Weekly MCC Event",
-              text: pinned.text || pinned.description || "",
-            });
-          }
-        }
-      } catch (e) {
-        console.error("Failed to read announcements in AnnouncementBar", e);
-      }
     }
 
     loadLatestAnnouncement();

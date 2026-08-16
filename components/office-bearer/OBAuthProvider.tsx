@@ -46,33 +46,43 @@ export const OBAuthProvider: React.FC<{ children: React.ReactNode }> = ({ childr
   const [feedPosts, setFeedPosts] = useState<FeedPostItem[]>(INITIAL_FEED_POSTS);
 
   useEffect(() => {
-    const savedAuth = localStorage.getItem("mcc_ob_authenticated");
-    const hasCookie = typeof document !== "undefined" && document.cookie.includes("mcc_ob_session");
-    if (savedAuth === "true" || hasCookie) {
-      setIsAuthenticated(true);
-      const savedEmail = localStorage.getItem("mcc_ob_email") || "";
-      const savedName = localStorage.getItem("mcc_ob_name") || "Office Bearer";
-      const savedDept = localStorage.getItem("mcc_ob_dept") || "Computer Science";
-      const savedResp = (localStorage.getItem("mcc_ob_resp") || "Unassigned") as OBProfile["assignedResponsibility"];
-      setCurrentOb({
-        id: "ob-session",
-        name: savedName,
-        email: savedEmail,
-        department: savedDept,
-        assignedResponsibility: savedResp,
-      });
-    } else {
-      setIsAuthenticated(false);
-      setCurrentOb(EMPTY_OB);
-    }
-    setIsHydrated(true);
+    const syncWithServer = async () => {
+      try {
+        const res = await fetch("/api/auth/session");
+        if (res.ok) {
+          const data = await res.json();
+          if (data.authenticated && data.role === "OFFICE_BEARER" && data.user) {
+            setIsAuthenticated(true);
+            const userObj = data.user;
+            setCurrentOb({
+              id: userObj.id || "ob-session",
+              name: userObj.name || userObj.email?.split("@")[0] || "Office Bearer",
+              email: userObj.email || "",
+              department: userObj.department || "Computer Science",
+              assignedResponsibility: userObj.responsibility || "Unassigned",
+            });
+          } else {
+            setIsAuthenticated(false);
+            setCurrentOb(EMPTY_OB);
+          }
+        } else {
+          setIsAuthenticated(false);
+          setCurrentOb(EMPTY_OB);
+        }
+      } catch (err) {
+        console.error("OB Session verification error:", err);
+        setIsAuthenticated(false);
+        setCurrentOb(EMPTY_OB);
+      } finally {
+        setIsHydrated(true);
+      }
+    };
+
+    syncWithServer();
   }, []);
 
   const loginOb = (email: string, obData?: Partial<OBProfile>) => {
     setIsAuthenticated(true);
-    localStorage.setItem("mcc_ob_authenticated", "true");
-    localStorage.setItem("mcc_ob_email", email);
-
     const newOb: OBProfile = {
       id: obData?.id || "ob-" + Date.now(),
       name: obData?.name || email.split("@")[0],
@@ -81,24 +91,15 @@ export const OBAuthProvider: React.FC<{ children: React.ReactNode }> = ({ childr
       assignedResponsibility: obData?.assignedResponsibility || "Unassigned",
     };
     setCurrentOb(newOb);
-    localStorage.setItem("mcc_ob_name", newOb.name);
-    localStorage.setItem("mcc_ob_dept", newOb.department);
-    localStorage.setItem("mcc_ob_resp", newOb.assignedResponsibility);
-    if (typeof document !== "undefined") {
-      document.cookie = `mcc_ob_session=${encodeURIComponent(email)}; path=/; max-age=86400; SameSite=Lax`;
-    }
   };
 
-  const logoutOb = () => {
+  const logoutOb = async () => {
     setIsAuthenticated(false);
     setCurrentOb(EMPTY_OB);
-    localStorage.removeItem("mcc_ob_authenticated");
-    localStorage.removeItem("mcc_ob_email");
-    localStorage.removeItem("mcc_ob_name");
-    localStorage.removeItem("mcc_ob_dept");
-    localStorage.removeItem("mcc_ob_resp");
-    if (typeof document !== "undefined") {
-      document.cookie = "mcc_ob_session=; path=/; expires=Thu, 01 Jan 1970 00:00:00 GMT";
+    try {
+      await fetch("/api/auth/logout", { method: "POST" });
+    } catch (err) {
+      console.error("Logout API call error:", err);
     }
   };
 
@@ -106,7 +107,6 @@ export const OBAuthProvider: React.FC<{ children: React.ReactNode }> = ({ childr
     const match = PRESET_OBS.find((ob) => ob.id === obId);
     if (match) {
       setCurrentOb(match);
-      localStorage.setItem("mcc_ob_email", match.email);
     }
   };
 

@@ -18,9 +18,9 @@ export const AdminHeader: React.FC<AdminHeaderProps> = ({
   const router = useRouter();
   const { adminName, adminEmail, logoutAdmin } = useAdminAuth();
 
-  const handleLogout = () => {
-    logoutAdmin();
-    router.push("/admin/login");
+  const handleLogout = async () => {
+    await logoutAdmin();
+    router.replace("/");
   };
 
   return (
