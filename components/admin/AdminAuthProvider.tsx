@@ -152,12 +152,28 @@ export const AdminAuthProvider: React.FC<{ children: React.ReactNode }> = ({ chi
       }
     };
 
+    // Load proposals from MongoDB
+    const fetchProposals = async () => {
+      try {
+        const propRes = await fetch("/api/admin/proposals");
+        if (propRes.ok) {
+          const propData = await propRes.json();
+          if (Array.isArray(propData.proposals)) {
+            setProposals(propData.proposals);
+          }
+        }
+      } catch (e) {
+        console.error("Failed to fetch proposals from MongoDB", e);
+      }
+    };
+
     // Call async functions
     syncWithServer();
     fetchUsersFromDb();
     fetchAnnouncements();
     fetchAvailability();
     fetchAssignments();
+    fetchProposals();
   }, []);
 
   const saveAnnouncements = async (newAnnouncements: Announcement[]) => {
@@ -334,21 +350,53 @@ export const AdminAuthProvider: React.FC<{ children: React.ReactNode }> = ({ chi
     }
   };
 
-  // Proposal Workflow
-  const approveProposal = (id: string) => {
-    setProposals((prev) =>
-      prev.map((p) => (p.id === id ? { ...p, status: "Approved" } : p))
-    );
+  // Proposal Workflow (MongoDB-persisted)
+  const approveProposal = async (id: string) => {
     const target = proposals.find((p) => p.id === id);
-    addAuditLog(`Approved Proposal (${target?.title})`, "Approval Workflow", "Success");
+    try {
+      const res = await fetch("/api/admin/proposals", {
+        method: "PUT",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ id, action: "approve" }),
+      });
+      if (res.ok) {
+        setProposals((prev) =>
+          prev.map((p) => (p.id === id ? { ...p, status: "Approved" } : p))
+        );
+        addAuditLog(`Approved Proposal (${target?.title})`, "Approval Workflow", "Success");
+        console.log(`✅ [MONGODB] Proposal ${id} approved`);
+      } else {
+        console.error("❌ Failed to approve proposal");
+        addAuditLog(`Failed to approve Proposal (${target?.title})`, "Approval Workflow", "Failure");
+      }
+    } catch (err) {
+      console.error("❌ Approve proposal network error:", err);
+      addAuditLog(`Failed to approve Proposal (${target?.title})`, "Approval Workflow", "Failure");
+    }
   };
 
-  const rejectProposal = (id: string) => {
-    setProposals((prev) =>
-      prev.map((p) => (p.id === id ? { ...p, status: "Rejected" } : p))
-    );
+  const rejectProposal = async (id: string) => {
     const target = proposals.find((p) => p.id === id);
-    addAuditLog(`Rejected Proposal (${target?.title})`, "Approval Workflow", "Warning");
+    try {
+      const res = await fetch("/api/admin/proposals", {
+        method: "PUT",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ id, action: "reject" }),
+      });
+      if (res.ok) {
+        setProposals((prev) =>
+          prev.map((p) => (p.id === id ? { ...p, status: "Rejected" } : p))
+        );
+        addAuditLog(`Rejected Proposal (${target?.title})`, "Approval Workflow", "Warning");
+        console.log(`✅ [MONGODB] Proposal ${id} rejected`);
+      } else {
+        console.error("❌ Failed to reject proposal");
+        addAuditLog(`Failed to reject Proposal (${target?.title})`, "Approval Workflow", "Failure");
+      }
+    } catch (err) {
+      console.error("❌ Reject proposal network error:", err);
+      addAuditLog(`Failed to reject Proposal (${target?.title})`, "Approval Workflow", "Failure");
+    }
   };
 
   // Announcement Management
@@ -528,16 +576,43 @@ export const AdminAuthProvider: React.FC<{ children: React.ReactNode }> = ({ chi
     addAuditLog("Exported Audit Logs to Excel/CSV", "Audit & Logs", "Success");
   };
 
-  // Activity Availability Control
-  const updateActivityAvailability = (activityName: string, status: ActivityAvailabilityStatus) => {
+  // Activity Availability Control (MongoDB-persisted)
+  const updateActivityAvailability = async (activityName: string, status: ActivityAvailabilityStatus) => {
     const oldStatus = activityAvailability[activityName] || "OPEN";
     const updated = {
       ...activityAvailability,
       [activityName]: status,
     };
+
+    // Optimistic update
     setActivityAvailability(updated);
-        // Local storage fallback removed; activity availability persisted via API
-    addAuditLog(`Changed ${activityName} availability: ${oldStatus} → ${status}`, "Responsibilities", "Success");
+
+    try {
+      const res = await fetch("/api/admin/activity-availability", {
+        method: "PUT",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ activityAvailability: updated }),
+      });
+
+      if (res.ok) {
+        const data = await res.json();
+        if (data.activityAvailability) {
+          setActivityAvailability(data.activityAvailability);
+        }
+        addAuditLog(`Changed ${activityName} availability: ${oldStatus} → ${status}`, "Responsibilities", "Success");
+        console.log(`✅ [MONGODB] Activity availability persisted: ${activityName} = ${status}`);
+      } else {
+        // Revert on failure
+        setActivityAvailability((prev) => ({ ...prev, [activityName]: oldStatus }));
+        console.error("❌ Failed to update activity availability");
+        addAuditLog(`Failed to change ${activityName} availability`, "Responsibilities", "Failure");
+      }
+    } catch (err) {
+      // Revert on network error
+      setActivityAvailability((prev) => ({ ...prev, [activityName]: oldStatus }));
+      console.error("❌ Activity availability network error:", err);
+      addAuditLog(`Failed to change ${activityName} availability (network error)`, "Responsibilities", "Failure");
+    }
   };
 
   return (

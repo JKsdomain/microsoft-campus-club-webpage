@@ -178,13 +178,40 @@ export const PlacementTestRunner: React.FC<PlacementTestRunnerProps> = ({
   }, [report, isFullscreen, isTerminated]);
 
   // Submit handler
-  const handleSubmitTest = () => {
+  const handleSubmitTest = async () => {
     if (document.fullscreenElement) {
       document.exitFullscreen().catch(() => {});
     }
-    const generatedReport = evaluatePlacementSubmission(username, email, userAnswers);
-    setReport(generatedReport);
-    onFinishTest(generatedReport);
+
+    try {
+      const res = await fetch("/api/students-corner/submit-test", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          testType: "Placement Questions",
+          username,
+          email,
+          userAnswers,
+        }),
+      });
+
+      if (!res.ok) {
+        const errData = await res.json().catch(() => ({}));
+        alert(errData.message || "Assessment submission rejected: This event is currently closed.");
+        return;
+      }
+
+      const data = await res.json();
+      const generatedReport = data.report || evaluatePlacementSubmission(username, email, userAnswers);
+      setReport(generatedReport);
+      onFinishTest(generatedReport);
+    } catch (err) {
+      console.error("Test submission network error:", err);
+      // Fallback local evaluation only if network issue
+      const generatedReport = evaluatePlacementSubmission(username, email, userAnswers);
+      setReport(generatedReport);
+      onFinishTest(generatedReport);
+    }
   };
 
   const handleSelectAnswer = (questionId: string, option: string) => {

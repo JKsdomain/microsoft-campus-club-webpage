@@ -52,10 +52,35 @@ export const QuizTestRunner: React.FC<QuizTestRunnerProps> = ({
     setUserAnswers((prev) => ({ ...prev, [questionId]: option }));
   };
 
-  const handleSubmitQuiz = () => {
-    const generatedReport = evaluateQuizSubmission(username, email, userAnswers);
-    setReport(generatedReport);
-    onFinishTest(generatedReport);
+  const handleSubmitQuiz = async () => {
+    try {
+      const res = await fetch("/api/students-corner/submit-test", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          testType: "General Quiz",
+          username,
+          email,
+          userAnswers,
+        }),
+      });
+
+      if (!res.ok) {
+        const errData = await res.json().catch(() => ({}));
+        alert(errData.message || "Quiz submission rejected: This event is currently closed.");
+        return;
+      }
+
+      const data = await res.json();
+      const generatedReport = data.report || evaluateQuizSubmission(username, email, userAnswers);
+      setReport(generatedReport);
+      onFinishTest(generatedReport);
+    } catch (err) {
+      console.error("Quiz submission network error:", err);
+      const generatedReport = evaluateQuizSubmission(username, email, userAnswers);
+      setReport(generatedReport);
+      onFinishTest(generatedReport);
+    }
   };
 
   const minutes = Math.floor(timeLeftSeconds / 60);

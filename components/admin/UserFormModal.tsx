@@ -19,6 +19,7 @@ const DEPARTMENTS = [
   "Electrical & Electronics",
   "Mechanical Engineering",
   "Civil Engineering",
+  "Artificial Intelligence & Data Science",
 ];
 
 const RESPONSIBILITIES = [

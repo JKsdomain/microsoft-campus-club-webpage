@@ -25,6 +25,12 @@ export interface Proposal {
   submittedDate: string;
   status: "Pending" | "Approved" | "Rejected";
   details: string;
+  authorDepartment?: string;
+  mediaType?: "none" | "image" | "video";
+  mediaUrl?: string;
+  mediaPublicId?: string;
+  likesCount?: number;
+  dislikesCount?: number;
 }
 
 export interface AnnouncementPoster {

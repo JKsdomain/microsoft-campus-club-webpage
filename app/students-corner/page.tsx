@@ -58,33 +58,51 @@ function StudentsCornerInner() {
   const [blockedMessage, setBlockedMessage] = useState<string | null>(null);
   const [testInfoPreviewOpen, setTestInfoPreviewOpen] = useState(false);
 
-  React.useEffect(() => {
-    const fetchAvailability = async () => {
-      try {
-        const res = await fetch("/api/admin/activity-availability");
-        if (res.ok) {
-          const data = await res.json();
-          if (data.activityAvailability) {
-            setActivityAvailability(data.activityAvailability);
-          }
+  const fetchAvailability = async () => {
+    try {
+      const res = await fetch("/api/activity-availability");
+      if (res.ok) {
+        const data = await res.json();
+        if (data.activityAvailability) {
+          setActivityAvailability(data.activityAvailability);
         }
-      } catch (e) {
-        console.error("Failed to fetch activity availability", e);
       }
-    };
-    fetchAvailability();
-  }, []);
+    } catch (e) {
+      console.error("Failed to fetch activity availability", e);
+    }
+  };
 
-  const handleStartTestFlow = (testType: "Placement Questions" | "General Quiz") => {
+  React.useEffect(() => {
+    fetchAvailability();
+  }, [activeTab]);
+
+  const handleStartTestFlow = async (testType: "Placement Questions" | "General Quiz") => {
+    // 1. Live backend verification from MongoDB
+    try {
+      const res = await fetch("/api/students-corner/validate-event", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ activityName: testType }),
+      });
+      const data = await res.json();
+      if (!res.ok || !data.allowed) {
+        setBlockedMessage(data.message || `"${testType}" is currently closed by the administrator.`);
+        setActivityAvailability((prev) => ({ ...prev, [testType]: data.status || "CLOSED" }));
+        return;
+      }
+    } catch (err) {
+      console.error("Availability validation network error:", err);
+    }
+
     const status = activityAvailability[testType] || "OPEN";
 
     if (status === "CLOSED") {
-      setBlockedMessage("This activity is currently closed.");
+      setBlockedMessage(`"${testType}" is currently closed by the administrator.`);
       return;
     }
 
     if (status === "COMING SOON") {
-      setBlockedMessage("This activity is not available yet.");
+      setBlockedMessage(`"${testType}" is not available yet.`);
       return;
     }
 
@@ -368,7 +386,26 @@ function StudentsCornerInner() {
         {/* TAB 2: PLACEMENT QUESTIONS */}
         {activeTab === "placement-questions" && (
           <div>
-            {!verifiedStudent ? (
+            {(activityAvailability["Placement Questions"] || "OPEN") === "CLOSED" ? (
+              <div className="p-12 text-center rounded-2xl bg-[#0D1B2A] border border-red-500/20 max-w-xl mx-auto space-y-5">
+                <div className="w-14 h-14 rounded-full bg-red-500/10 border border-red-500/30 text-red-400 flex items-center justify-center mx-auto">
+                  <AlertTriangle className="w-7 h-7" />
+                </div>
+                <div>
+                  <h3 className="text-2xl font-bold text-[#F8FAFC]">Placement Questions Closed</h3>
+                  <p className="text-xs text-[#CBD5E1] mt-1.5 leading-relaxed">
+                    This assessment is currently closed by the administrator. Please check back later or explore other live MCC activities.
+                  </p>
+                </div>
+                <Button
+                  onClick={() => setActiveTab("overview")}
+                  variant="outline"
+                  size="md"
+                >
+                  Return to Overview
+                </Button>
+              </div>
+            ) : !verifiedStudent ? (
               <div className="p-12 text-center rounded-2xl bg-[#0D1B2A] border border-white/10 max-w-xl mx-auto space-y-5">
                 <BriefcaseBusiness className="w-12 h-12 text-[#0078D4] mx-auto" />
                 <div>
@@ -399,7 +436,26 @@ function StudentsCornerInner() {
         {/* TAB 3: GENERAL QUIZ */}
         {activeTab === "general-quiz" && (
           <div>
-            {!verifiedStudent ? (
+            {(activityAvailability["General Quiz"] || "OPEN") === "CLOSED" ? (
+              <div className="p-12 text-center rounded-2xl bg-[#0D1B2A] border border-red-500/20 max-w-xl mx-auto space-y-5">
+                <div className="w-14 h-14 rounded-full bg-red-500/10 border border-red-500/30 text-red-400 flex items-center justify-center mx-auto">
+                  <AlertTriangle className="w-7 h-7" />
+                </div>
+                <div>
+                  <h3 className="text-2xl font-bold text-[#F8FAFC]">General Quiz Closed</h3>
+                  <p className="text-xs text-[#CBD5E1] mt-1.5 leading-relaxed">
+                    This quiz is currently closed by the administrator. Please check back later or explore other live MCC activities.
+                  </p>
+                </div>
+                <Button
+                  onClick={() => setActiveTab("overview")}
+                  variant="outline"
+                  size="md"
+                >
+                  Return to Overview
+                </Button>
+              </div>
+            ) : !verifiedStudent ? (
               <div className="p-12 text-center rounded-2xl bg-[#0D1B2A] border border-white/10 max-w-xl mx-auto space-y-5">
                 <CircleHelp className="w-12 h-12 text-blue-400 mx-auto" />
                 <div>
@@ -430,34 +486,55 @@ function StudentsCornerInner() {
         {/* TAB 4: TECHNICAL GAMES */}
         {activeTab === "technical-games" && (
           <div className="space-y-6 max-w-4xl mx-auto animate-fade-in">
-            <div className="p-8 rounded-2xl bg-[#0D1B2A] border border-white/10 shadow-xl space-y-4 text-center">
-              <Gamepad2 className="w-12 h-12 text-emerald-400 mx-auto" />
-              <h3 className="text-2xl font-bold text-[#F8FAFC]">Technical Games Arena</h3>
-              <p className="text-xs text-[#CBD5E1] max-w-md mx-auto">
-                Explore published technical gaming rounds, speed debugging challenges, and IoT hacking arenas.
-              </p>
-
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 text-left pt-4">
-                <div className="p-4 rounded-xl bg-[#07111F] border border-white/10 space-y-2">
-                  <span className="text-xs font-bold text-[#22D3EE] block">Azure Speed Challenge</span>
-                  <p className="text-xs text-[#94A3B8]">
-                    Embedded micro-challenge round focused on Cloud API latency optimization.
-                  </p>
-                  <span className="inline-block px-2.5 py-0.5 rounded text-[10px] bg-emerald-500/10 text-emerald-400">
-                    Live Arena
-                  </span>
+            {(activityAvailability["Technical Games"] || "COMING SOON") === "CLOSED" ? (
+              <div className="p-12 text-center rounded-2xl bg-[#0D1B2A] border border-red-500/20 max-w-xl mx-auto space-y-5">
+                <div className="w-14 h-14 rounded-full bg-red-500/10 border border-red-500/30 text-red-400 flex items-center justify-center mx-auto">
+                  <AlertTriangle className="w-7 h-7" />
                 </div>
-                <div className="p-4 rounded-xl bg-[#07111F] border border-white/10 space-y-2">
-                  <span className="text-xs font-bold text-amber-400 block">CTF Binary Exploitation</span>
-                  <p className="text-xs text-[#94A3B8]">
-                    Find vulnerabilities in compiled binaries and submit secret flag strings.
+                <div>
+                  <h3 className="text-2xl font-bold text-[#F8FAFC]">Technical Games Closed</h3>
+                  <p className="text-xs text-[#CBD5E1] mt-1.5 leading-relaxed">
+                    This arena is currently closed by the administrator. Please check back later.
                   </p>
-                  <span className="inline-block px-2.5 py-0.5 rounded text-[10px] bg-amber-500/10 text-amber-400">
-                    Upcoming Round
-                  </span>
+                </div>
+                <Button
+                  onClick={() => setActiveTab("overview")}
+                  variant="outline"
+                  size="md"
+                >
+                  Return to Overview
+                </Button>
+              </div>
+            ) : (
+              <div className="p-8 rounded-2xl bg-[#0D1B2A] border border-white/10 shadow-xl space-y-4 text-center">
+                <Gamepad2 className="w-12 h-12 text-emerald-400 mx-auto" />
+                <h3 className="text-2xl font-bold text-[#F8FAFC]">Technical Games Arena</h3>
+                <p className="text-xs text-[#CBD5E1] max-w-md mx-auto">
+                  Explore published technical gaming rounds, speed debugging challenges, and IoT hacking arenas.
+                </p>
+
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 text-left pt-4">
+                  <div className="p-4 rounded-xl bg-[#07111F] border border-white/10 space-y-2">
+                    <span className="text-xs font-bold text-[#22D3EE] block">Azure Speed Challenge</span>
+                    <p className="text-xs text-[#94A3B8]">
+                      Embedded micro-challenge round focused on Cloud API latency optimization.
+                    </p>
+                    <span className="inline-block px-2.5 py-0.5 rounded text-[10px] bg-emerald-500/10 text-emerald-400">
+                      Live Arena
+                    </span>
+                  </div>
+                  <div className="p-4 rounded-xl bg-[#07111F] border border-white/10 space-y-2">
+                    <span className="text-xs font-bold text-amber-400 block">CTF Binary Exploitation</span>
+                    <p className="text-xs text-[#94A3B8]">
+                      Find vulnerabilities in compiled binaries and submit secret flag strings.
+                    </p>
+                    <span className="inline-block px-2.5 py-0.5 rounded text-[10px] bg-amber-500/10 text-amber-400">
+                      Upcoming Round
+                    </span>
+                  </div>
                 </div>
               </div>
-            </div>
+            )}
           </div>
         )}
 

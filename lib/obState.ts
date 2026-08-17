@@ -32,6 +32,7 @@ export interface FeedPostItem {
   content: string;
   mediaType: "none" | "image" | "video";
   mediaUrl?: string;
+  mediaPublicId?: string;
   status: "Pending Approval" | "Approved" | "Rejected";
   likesCount: number;
   dislikesCount: number;

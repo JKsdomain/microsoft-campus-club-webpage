@@ -30,6 +30,7 @@ const OfficeBearerSchema = new Schema(
     name: { type: String, required: true },
     email: { type: String, required: true, unique: true, index: true },
     passwordHash: { type: String, required: true },
+    department: { type: String, default: "Computer Science & Engineering" },
     responsibilityId: {
       type: Schema.Types.ObjectId,
       ref: "responsibilities",
@@ -44,6 +45,7 @@ const OfficeBearerSchema = new Schema(
   },
   { timestamps: true }
 );
+
 
 // 4. ANNOUNCEMENTS
 const AnnouncementSchema = new Schema(
@@ -78,8 +80,10 @@ const ProposalSchema = new Schema(
       required: true,
       index: true,
     },
-    referenceId: { type: Schema.Types.ObjectId, required: true, index: true },
+    title: { type: String, default: "" },
+    referenceId: { type: Schema.Types.ObjectId, default: null, index: true },
     submittedBy: { type: String, required: true, index: true },
+    authorDepartment: { type: String, default: "Computer Science & Engineering" },
     status: {
       type: String,
       enum: ["DRAFT", "PENDING", "APPROVED", "REJECTED"],
@@ -90,9 +94,25 @@ const ProposalSchema = new Schema(
     reviewedAt: { type: Date, default: null },
     reviewedBy: { type: Schema.Types.ObjectId, ref: "admins", default: null },
     rejectionReason: { type: String, default: null },
+    // Quiz/Placement specific metadata
+    questionsToUpload: { type: Number, default: null },
+    questionsToDisplay: { type: Number, default: null },
+    randomQuestions: { type: Boolean, default: null },
+    randomChoices: { type: Boolean, default: null },
+    timerMinutes: { type: Number, default: null },
+    questionsDetected: { type: Number, default: null },
+    csvFileName: { type: String, default: null },
+    details: { type: String, default: "" },
+    // Feed specific metadata
+    mediaType: { type: String, enum: ["none", "image", "video", "IMAGE", "VIDEO"], default: "none" },
+    mediaUrl: { type: String, default: null },
+    mediaPublicId: { type: String, default: "" },
+    likesCount: { type: Number, default: 0 },
+    dislikesCount: { type: Number, default: 0 },
   },
   { timestamps: true }
 );
+
 
 // 6. QUIZZES
 const QuizSchema = new Schema(

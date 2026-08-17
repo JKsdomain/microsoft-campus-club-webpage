@@ -13,7 +13,9 @@ export const FeedComposer: React.FC = () => {
   const [postContent, setPostContent] = useState("");
   const [mediaType, setMediaType] = useState<"none" | "image" | "video">("none");
   const [mediaUrl, setMediaUrl] = useState<string>("");
+  const [mediaPublicId, setMediaPublicId] = useState<string>("");
   const [isUploadingMedia, setIsUploadingMedia] = useState(false);
+  const [isSubmitting, setIsSubmitting] = useState(false);
   const [submitSuccess, setSubmitSuccess] = useState(false);
 
   if (!isAssigned) {
@@ -42,6 +44,7 @@ export const FeedComposer: React.FC = () => {
       const data = await res.json();
       setMediaType(data.type === "VIDEO" ? "video" : "image");
       setMediaUrl(data.url);
+      setMediaPublicId(data.publicId || "");
     } catch (err: any) {
       alert(err.message || "Unable to upload media to Cloudinary. Please try again.");
     } finally {
@@ -52,18 +55,27 @@ export const FeedComposer: React.FC = () => {
   const handleRemoveMedia = () => {
     setMediaType("none");
     setMediaUrl("");
+    setMediaPublicId("");
   };
 
-  const handleSubmit = (e: React.FormEvent) => {
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!postContent.trim()) return;
+    if (!postContent.trim() || isSubmitting) return;
 
-    submitFeedPost(postContent.trim(), mediaType, mediaUrl || undefined);
-    setPostContent("");
-    setMediaType("none");
-    setMediaUrl("");
-    setSubmitSuccess(true);
-    setTimeout(() => setSubmitSuccess(false), 4000);
+    setIsSubmitting(true);
+    try {
+      await submitFeedPost(postContent.trim(), mediaType, mediaUrl || undefined, mediaPublicId || undefined);
+      setPostContent("");
+      setMediaType("none");
+      setMediaUrl("");
+      setMediaPublicId("");
+      setSubmitSuccess(true);
+      setTimeout(() => setSubmitSuccess(false), 4000);
+    } catch (err: any) {
+      alert("Failed to submit post for approval. Please try again.");
+    } finally {
+      setIsSubmitting(false);
+    }
   };
 
   const pendingPosts = feedPosts.filter((p) => p.status === "Pending Approval");
@@ -190,10 +202,10 @@ export const FeedComposer: React.FC = () => {
                   type="submit"
                   variant="primary"
                   size="md"
-                  disabled={!postContent.trim() || isUploadingMedia}
+                  disabled={!postContent.trim() || isUploadingMedia || isSubmitting}
                   leftIcon={<Send className="w-4 h-4" />}
                 >
-                  Submit for Approval
+                  {isSubmitting ? "Submitting..." : "Submit for Approval"}
                 </Button>
               </div>
             </form>

@@ -198,11 +198,23 @@ export const ProposalReviewModal: React.FC<ProposalReviewModalProps> = ({
                   <div className="space-y-3 text-xs">
                     <div className="flex items-center space-x-2 pb-2 border-b border-white/10">
                       <span className="font-bold text-[#F8FAFC]">{proposal.submittedBy}</span>
+                      {proposal.authorDepartment && (
+                        <span className="text-[#94A3B8]">({proposal.authorDepartment})</span>
+                      )}
                       <span className="text-[#94A3B8]">• {proposal.submittedDate}</span>
                     </div>
                     <p className="text-[#CBD5E1] leading-relaxed whitespace-pre-line text-sm">
                       {proposal.details}
                     </p>
+                    {proposal.mediaUrl && (
+                      <div className="rounded-xl overflow-hidden border border-white/10 max-h-60 bg-black mt-3">
+                        {proposal.mediaType === "video" ? (
+                          <video src={proposal.mediaUrl} controls className="w-full max-h-56 object-cover" />
+                        ) : (
+                          <img src={proposal.mediaUrl} alt="Feed media" className="w-full max-h-56 object-cover" />
+                        )}
+                      </div>
+                    )}
                   </div>
                 )}
 
