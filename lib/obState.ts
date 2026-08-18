@@ -18,10 +18,14 @@ export interface QuizSubmission {
   timerMinutes: number;
   submittedBy: string;
   submittedDate: string;
-  status: "Pending Approval" | "Approved" | "Rejected";
+  status: "Pending Approval" | "Approved" | "Rejected" | "Pending Re-Approval" | "Archived";
   questionsDetected: number;
   csvFileName: string;
   rejectionReason?: string;
+  revisionNumber?: number;
+  parentId?: string | null;
+  startAt?: string | null;
+  endAt?: string | null;
 }
 
 export interface FeedPostItem {
@@ -33,10 +37,12 @@ export interface FeedPostItem {
   mediaType: "none" | "image" | "video";
   mediaUrl?: string;
   mediaPublicId?: string;
-  status: "Pending Approval" | "Approved" | "Rejected";
+  status: "Pending Approval" | "Approved" | "Rejected" | "Pending Re-Approval" | "Archived";
   likesCount: number;
   dislikesCount: number;
   userVote?: "like" | "dislike" | null;
+  revisionNumber?: number;
+  parentId?: string | null;
 }
 
 // Clean preset OBs list (No hardcoded preset accounts)

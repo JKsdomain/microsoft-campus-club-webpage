@@ -26,6 +26,10 @@ interface OBAuthContextType {
   submitFeedPost: (content: string, mediaType?: "none" | "image" | "video", mediaUrl?: string, mediaPublicId?: string) => Promise<void>;
   toggleFeedVote: (postId: string, vote: "like" | "dislike") => void;
   publishedFeedPosts: FeedPostItem[];
+
+  submitRevision: (parentId: string, changes: Record<string, any>, revisionComment?: string) => Promise<boolean>;
+  extendDeadline: (activityId: string, endAt: string | Date, startAt?: string | Date) => Promise<boolean>;
+  refreshProposals: () => Promise<void>;
 }
 
 const OBAuthContext = createContext<OBAuthContextType | undefined>(undefined);
@@ -44,6 +48,63 @@ export const OBAuthProvider: React.FC<{ children: React.ReactNode }> = ({ childr
   const [currentOb, setCurrentOb] = useState<OBProfile>(EMPTY_OB);
   const [submissions, setSubmissions] = useState<QuizSubmission[]>(INITIAL_SUBMISSIONS);
   const [feedPosts, setFeedPosts] = useState<FeedPostItem[]>(INITIAL_FEED_POSTS);
+
+  // Load submissions & feed proposals from MongoDB
+  const fetchProposalsData = async () => {
+    try {
+      const res = await fetch("/api/admin/proposals");
+      if (res.ok) {
+        const data = await res.json();
+        if (Array.isArray(data.proposals)) {
+          // 1. Map Quiz & Placement proposals (exclude Archived from active list but include for history)
+          const mappedQuiz: QuizSubmission[] = data.proposals
+            .filter((p: any) => p.type === "General Quiz" || p.type === "Placement Questions" || p.type === "Technical Games")
+            .map((p: any) => ({
+              id: p.id,
+              type: p.type === "Technical Games" ? "General Quiz" as const : p.type,
+              title: p.title,
+              questionsToUpload: p.questionsToUpload || 0,
+              questionsToDisplay: p.questionsToDisplay || 0,
+              randomQuestions: p.randomQuestions || false,
+              randomChoices: p.randomChoices || false,
+              timerMinutes: p.timerMinutes || 30,
+              submittedBy: p.submittedBy,
+              submittedDate: p.submittedDate,
+              status: p.status === "Pending" ? "Pending Approval" : p.status === "Pending Re-Approval" ? "Pending Re-Approval" : p.status,
+              questionsDetected: p.questionsDetected || 0,
+              csvFileName: p.csvFileName || "",
+              revisionNumber: p.revisionNumber || 0,
+              parentId: p.parentId || null,
+              startAt: p.startAt || null,
+              endAt: p.endAt || null,
+            }));
+          setSubmissions(mappedQuiz);
+
+          // 2. Map Feed Community proposals
+          const mappedFeed: FeedPostItem[] = data.proposals
+            .filter((p: any) => p.type === "Feed Community")
+            .map((p: any) => ({
+              id: p.id,
+              authorName: p.submittedBy,
+              authorDepartment: p.authorDepartment || "Computer Science & Engineering",
+              timestamp: p.submittedDate,
+              content: p.details || p.title || "",
+              mediaType: (p.mediaType === "IMAGE" || p.mediaType === "image") ? "image" : (p.mediaType === "VIDEO" || p.mediaType === "video") ? "video" : "none",
+              mediaUrl: p.mediaUrl || undefined,
+              mediaPublicId: p.mediaPublicId || undefined,
+              status: p.status === "Pending" ? "Pending Approval" : p.status === "Pending Re-Approval" ? "Pending Re-Approval" : p.status,
+              likesCount: p.likesCount || 0,
+              dislikesCount: p.dislikesCount || 0,
+              revisionNumber: p.revisionNumber || 0,
+              parentId: p.parentId || null,
+            }));
+          setFeedPosts(mappedFeed);
+        }
+      }
+    } catch (e) {
+      console.error("Failed to fetch proposals from MongoDB", e);
+    }
+  };
 
   useEffect(() => {
     const syncWithServer = async () => {
@@ -75,57 +136,6 @@ export const OBAuthProvider: React.FC<{ children: React.ReactNode }> = ({ childr
         setCurrentOb(EMPTY_OB);
       } finally {
         setIsHydrated(true);
-      }
-    };
-
-    // Load submissions & feed proposals from MongoDB
-    const fetchProposalsData = async () => {
-      try {
-        const res = await fetch("/api/admin/proposals");
-        if (res.ok) {
-          const data = await res.json();
-          if (Array.isArray(data.proposals)) {
-            // 1. Map Quiz & Placement proposals
-            const mappedQuiz: QuizSubmission[] = data.proposals
-              .filter((p: any) => p.type === "General Quiz" || p.type === "Placement Questions")
-              .map((p: any) => ({
-                id: p.id,
-                type: p.type,
-                title: p.title,
-                questionsToUpload: p.questionsToUpload || 0,
-                questionsToDisplay: p.questionsToDisplay || 0,
-                randomQuestions: p.randomQuestions || false,
-                randomChoices: p.randomChoices || false,
-                timerMinutes: p.timerMinutes || 30,
-                submittedBy: p.submittedBy,
-                submittedDate: p.submittedDate,
-                status: p.status === "Pending" ? "Pending Approval" : p.status,
-                questionsDetected: p.questionsDetected || 0,
-                csvFileName: p.csvFileName || "",
-              }));
-            setSubmissions(mappedQuiz);
-
-            // 2. Map Feed Community proposals
-            const mappedFeed: FeedPostItem[] = data.proposals
-              .filter((p: any) => p.type === "Feed Community")
-              .map((p: any) => ({
-                id: p.id,
-                authorName: p.submittedBy,
-                authorDepartment: p.authorDepartment || "Computer Science & Engineering",
-                timestamp: p.submittedDate,
-                content: p.details || p.title || "",
-                mediaType: (p.mediaType === "IMAGE" || p.mediaType === "image") ? "image" : (p.mediaType === "VIDEO" || p.mediaType === "video") ? "video" : "none",
-                mediaUrl: p.mediaUrl || undefined,
-                mediaPublicId: p.mediaPublicId || undefined,
-                status: p.status === "Pending" ? "Pending Approval" : p.status,
-                likesCount: p.likesCount || 0,
-                dislikesCount: p.dislikesCount || 0,
-              }));
-            setFeedPosts(mappedFeed);
-          }
-        }
-      } catch (e) {
-        console.error("Failed to fetch proposals from MongoDB", e);
       }
     };
 
@@ -188,6 +198,8 @@ export const OBAuthProvider: React.FC<{ children: React.ReactNode }> = ({ childr
           timerMinutes: data.timerMinutes,
           questionsDetected: data.questionsDetected,
           csvFileName: data.csvFileName,
+          startAt: data.startAt,
+          endAt: data.endAt,
         }),
       });
 
@@ -208,6 +220,8 @@ export const OBAuthProvider: React.FC<{ children: React.ReactNode }> = ({ childr
             status: "Pending Approval",
             questionsDetected: data.questionsDetected,
             csvFileName: data.csvFileName,
+            startAt: result.proposal.startAt || data.startAt,
+            endAt: result.proposal.endAt || data.endAt,
           };
           setSubmissions((prev) => [newSub, ...prev]);
           console.log(`✅ [MONGODB] Quiz Proposal submitted: ${result.proposal.id}`);
@@ -323,6 +337,79 @@ export const OBAuthProvider: React.FC<{ children: React.ReactNode }> = ({ childr
     }
   };
 
+  // Submit a revision for an already-approved activity
+  const submitRevision = async (
+    parentId: string,
+    changes: Record<string, any>,
+    revisionComment?: string
+  ): Promise<boolean> => {
+    try {
+      const res = await fetch("/api/admin/proposals", {
+        method: "PUT",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          id: parentId,
+          action: "revise",
+          changes,
+          revisionComment: revisionComment || "",
+        }),
+      });
+
+      if (res.ok) {
+        const result = await res.json();
+        console.log(`✅ [MONGODB] Revision #${result.revisionNumber} created for ${parentId}`);
+        // Refresh proposals from MongoDB to get the latest state
+        await fetchProposalsData();
+        return true;
+      } else {
+        const errData = await res.json().catch(() => ({}));
+        console.error("❌ Failed to create revision:", errData.message);
+        alert(errData.message || "Failed to submit revision for re-approval.");
+        return false;
+      }
+    } catch (err) {
+      console.error("❌ Revision submission network error:", err);
+      alert("Network error. Failed to submit revision.");
+      return false;
+    }
+  };
+
+  // Extend or adjust deadline for an approved activity without requiring Admin re-approval
+  const extendDeadline = async (
+    activityId: string,
+    endAt: string | Date,
+    startAt?: string | Date
+  ): Promise<boolean> => {
+    try {
+      const res = await fetch("/api/office-bearer/activities/timeline", {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          activityId,
+          endAt: typeof endAt === "string" ? endAt : endAt.toISOString(),
+          startAt: startAt ? (typeof startAt === "string" ? startAt : startAt.toISOString()) : undefined,
+        }),
+      });
+
+      if (res.ok) {
+        console.log(`✅ [MONGODB] Deadline updated for activity: ${activityId}`);
+        await fetchProposalsData();
+        return true;
+      } else {
+        const errData = await res.json().catch(() => ({}));
+        console.error("❌ Failed to update deadline:", errData.message);
+        alert(errData.message || "Failed to update activity deadline.");
+        return false;
+      }
+    } catch (err) {
+      console.error("❌ Deadline update network error:", err);
+      alert("Network error while updating deadline.");
+      return false;
+    }
+  };
+
+  const refreshProposals = fetchProposalsData;
+
   const publishedFeedPosts = feedPosts.filter((p) => p.status === "Approved");
 
   return (
@@ -341,6 +428,9 @@ export const OBAuthProvider: React.FC<{ children: React.ReactNode }> = ({ childr
         submitFeedPost,
         toggleFeedVote,
         publishedFeedPosts,
+        submitRevision,
+        extendDeadline,
+        refreshProposals,
       }}
     >
       {children}

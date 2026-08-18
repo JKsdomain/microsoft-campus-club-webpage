@@ -1,12 +1,12 @@
 import { NextResponse } from "next/server";
 import { dbConnect } from "@/lib/db/dbConnect";
-import { SystemSetting, TestAttempt } from "@/lib/db/models";
+import { SystemSetting, ProposalModel, TestAttempt } from "@/lib/db/models";
 import { evaluatePlacementSubmission, evaluateQuizSubmission } from "@/lib/studentState";
 import mongoose from "mongoose";
 
 // POST /api/students-corner/submit-test
 // Body: { testType: "Placement Questions" | "General Quiz", username: string, email: string, userAnswers: Record<string, string> }
-// Validates MongoDB activityAvailability BEFORE accepting and processing submission.
+// Validates MongoDB activity timeline & availability BEFORE accepting and processing submission.
 export async function POST(req: Request) {
   try {
     await dbConnect();
@@ -20,7 +20,48 @@ export async function POST(req: Request) {
       );
     }
 
-    // 1. Mandatory MongoDB availability check
+    const now = new Date();
+
+    // 1. Mandatory MongoDB Timeline Check for General Quiz & Placement Questions
+    if (testType === "General Quiz" || testType === "Placement Questions") {
+      const dbType = testType === "General Quiz" ? "GENERAL_QUIZ" : "PLACEMENT_QUESTIONS";
+      const activeProposal = await ProposalModel.findOne({
+        type: dbType,
+        status: "APPROVED",
+        isActive: true,
+      }).sort({ submittedAt: -1 });
+
+      if (activeProposal && activeProposal.startAt && activeProposal.endAt) {
+        const startAt = new Date(activeProposal.startAt);
+        const endAt = new Date(activeProposal.endAt);
+
+        if (now < startAt) {
+          console.warn(`⛔ [SUBMIT TEST REJECTED] ${testType} has not started yet (Start: ${startAt.toISOString()}).`);
+          return NextResponse.json(
+            {
+              allowed: false,
+              status: "UPCOMING",
+              message: `Assessment submission rejected: "${testType}" has not started yet.`,
+            },
+            { status: 403 }
+          );
+        }
+
+        if (now > endAt) {
+          console.warn(`⛔ [SUBMIT TEST REJECTED] ${testType} has passed deadline (End: ${endAt.toISOString()}).`);
+          return NextResponse.json(
+            {
+              allowed: false,
+              status: "CLOSED",
+              message: `Assessment submission rejected: "${testType}" has ended. Submissions are closed.`,
+            },
+            { status: 403 }
+          );
+        }
+      }
+    }
+
+    // 2. Base SystemSetting fallback availability check
     const setting = await SystemSetting.findOne({ key: "activityAvailability" });
     const availabilityMap: Record<string, string> = setting?.value || {
       "Placement Questions": "OPEN",
@@ -42,7 +83,7 @@ export async function POST(req: Request) {
       );
     }
 
-    // 2. Evaluate submission
+    // 3. Evaluate submission
     let report;
     if (testType === "Placement Questions") {
       report = evaluatePlacementSubmission(username, email, userAnswers || {});
@@ -50,7 +91,7 @@ export async function POST(req: Request) {
       report = evaluateQuizSubmission(username, email, userAnswers || {});
     }
 
-    // 3. Persist attempt record to MongoDB if TestAttempt model is available
+    // 4. Persist attempt record to MongoDB if TestAttempt model is available
     try {
       if (TestAttempt) {
         await TestAttempt.create({

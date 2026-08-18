@@ -76,7 +76,7 @@ const ProposalSchema = new Schema(
   {
     type: {
       type: String,
-      enum: ["GENERAL_QUIZ", "PLACEMENT_QUESTIONS", "FEED"],
+      enum: ["GENERAL_QUIZ", "PLACEMENT_QUESTIONS", "FEED", "TECHNICAL_GAMES"],
       required: true,
       index: true,
     },
@@ -86,7 +86,7 @@ const ProposalSchema = new Schema(
     authorDepartment: { type: String, default: "Computer Science & Engineering" },
     status: {
       type: String,
-      enum: ["DRAFT", "PENDING", "APPROVED", "REJECTED"],
+      enum: ["DRAFT", "PENDING", "APPROVED", "REJECTED", "PENDING_REAPPROVAL", "ARCHIVED"],
       default: "PENDING",
       index: true,
     },
@@ -109,6 +109,14 @@ const ProposalSchema = new Schema(
     mediaPublicId: { type: String, default: "" },
     likesCount: { type: Number, default: 0 },
     dislikesCount: { type: Number, default: 0 },
+    // Revision fields
+    revisionNumber: { type: Number, default: 0 },
+    parentId: { type: Schema.Types.ObjectId, ref: "proposals", default: null },
+    isActive: { type: Boolean, default: true },
+    revisionComment: { type: String, default: "" },
+    // Timeline fields (General Quiz & Placement Questions)
+    startAt: { type: Date, default: null },
+    endAt: { type: Date, default: null },
   },
   { timestamps: true }
 );
@@ -138,6 +146,8 @@ const QuizSchema = new Schema(
       index: true,
     },
     publishedAt: { type: Date, default: null },
+    startAt: { type: Date, default: null },
+    endAt: { type: Date, default: null },
     createdBy: { type: String, required: true },
     approvedBy: { type: Schema.Types.ObjectId, ref: "admins", default: null },
     approvedAt: { type: Date, default: null },
@@ -187,6 +197,8 @@ const PlacementQuestionSetSchema = new Schema(
     },
     weekId: { type: Schema.Types.ObjectId, default: null, index: true },
     publishedAt: { type: Date, default: null, index: true },
+    startAt: { type: Date, default: null },
+    endAt: { type: Date, default: null },
     createdBy: { type: String, required: true },
     approvedBy: { type: Schema.Types.ObjectId, ref: "admins", default: null },
     approvedAt: { type: Date, default: null },
@@ -251,7 +263,7 @@ const FeedPostSchema = new Schema(
     ],
     status: {
       type: String,
-      enum: ["DRAFT", "PENDING", "APPROVED", "REJECTED", "PUBLISHED"],
+      enum: ["DRAFT", "PENDING", "APPROVED", "REJECTED", "PUBLISHED", "ARCHIVED"],
       default: "PENDING",
       index: true,
     },

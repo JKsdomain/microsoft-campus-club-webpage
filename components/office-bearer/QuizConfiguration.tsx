@@ -1,7 +1,7 @@
 "use client";
 
 import React, { useState } from "react";
-import { UploadCloud, FileText, CheckCircle2, AlertCircle, Send, Clock, HelpCircle } from "lucide-react";
+import { UploadCloud, FileText, CheckCircle2, AlertCircle, Send, Clock, Calendar, ArrowRight, RefreshCw, X } from "lucide-react";
 import { useOBAuth } from "./OBAuthProvider";
 import { UnauthorizedGuard } from "./UnauthorizedGuard";
 import { Button } from "../ui/Button";
@@ -13,7 +13,7 @@ interface QuizConfigurationProps {
 export const QuizConfiguration: React.FC<QuizConfigurationProps> = ({
   activityType,
 }) => {
-  const { hasResponsibility, submitQuizProposal, submissions } = useOBAuth();
+  const { hasResponsibility, submitQuizProposal, submissions, extendDeadline } = useOBAuth();
 
   // Check authorization permission
   const isAssigned = hasResponsibility(activityType);
@@ -30,6 +30,14 @@ export const QuizConfiguration: React.FC<QuizConfigurationProps> = ({
   const [randomChoices, setRandomChoices] = useState<boolean>(false);
   const [timerMinutes, setTimerMinutes] = useState<number>(30);
 
+  // Timeline / Schedule State (Default: starts today at 10:00, ends tomorrow at 17:00)
+  const todayStr = new Date().toISOString().split("T")[0];
+  const tomorrowStr = new Date(Date.now() + 24 * 60 * 60 * 1000).toISOString().split("T")[0];
+  const [startDate, setStartDate] = useState<string>(todayStr);
+  const [startTime, setStartTime] = useState<string>("10:00");
+  const [endDate, setEndDate] = useState<string>(tomorrowStr);
+  const [endTime, setEndTime] = useState<string>("17:00");
+
   // CSV File & Validation State
   const [csvFileName, setCsvFileName] = useState<string | null>(null);
   const [csvQuestionsCount, setCsvQuestionsCount] = useState<number | null>(null);
@@ -38,6 +46,13 @@ export const QuizConfiguration: React.FC<QuizConfigurationProps> = ({
 
   // Submission Toast / Feedback
   const [submitSuccess, setSubmitSuccess] = useState<boolean>(false);
+
+  // Deadline Extension Modal State
+  const [extendingSubmission, setExtendingSubmission] = useState<any | null>(null);
+  const [extEndDate, setExtEndDate] = useState<string>("");
+  const [extEndTime, setExtEndTime] = useState<string>("");
+  const [isExtending, setIsExtending] = useState<boolean>(false);
+  const [extSuccess, setExtSuccess] = useState<boolean>(false);
 
   if (!isAssigned) {
     return <UnauthorizedGuard activityName={activityType} />;
@@ -119,12 +134,36 @@ export const QuizConfiguration: React.FC<QuizConfigurationProps> = ({
     setIsValidated(true);
   };
 
+  const validateTimeline = () => {
+    if (!startDate || !startTime || !endDate || !endTime) {
+      return "Start date, start time, end date, and end time are all required.";
+    }
+    const start = new Date(`${startDate}T${startTime}`);
+    const end = new Date(`${endDate}T${endTime}`);
+    if (isNaN(start.getTime()) || isNaN(end.getTime())) {
+      return "Invalid date or time format.";
+    }
+    if (end.getTime() <= start.getTime()) {
+      return "End Date & Time must be strictly after Start Date & Time.";
+    }
+    return null;
+  };
+
   const handleSubmitForApproval = (e: React.FormEvent) => {
     e.preventDefault();
     if (!isValidated || !csvFileName || !csvQuestionsCount) {
       setValidationError("Please upload and validate a valid CSV file before submitting.");
       return;
     }
+
+    const timelineErr = validateTimeline();
+    if (timelineErr) {
+      setValidationError(timelineErr);
+      return;
+    }
+
+    const startDateTime = new Date(`${startDate}T${startTime}`);
+    const endDateTime = new Date(`${endDate}T${endTime}`);
 
     submitQuizProposal({
       type: activityType,
@@ -136,13 +175,79 @@ export const QuizConfiguration: React.FC<QuizConfigurationProps> = ({
       timerMinutes,
       questionsDetected: csvQuestionsCount,
       csvFileName,
+      startAt: startDateTime.toISOString(),
+      endAt: endDateTime.toISOString(),
     });
 
     setSubmitSuccess(true);
   };
 
+  // Open timeline extension modal
+  const handleOpenExtend = (sub: any) => {
+    setExtendingSubmission(sub);
+    setExtSuccess(false);
+    if (sub.endAt) {
+      const d = new Date(sub.endAt);
+      setExtEndDate(d.toISOString().split("T")[0]);
+      setExtEndTime(d.toTimeString().substring(0, 5));
+    } else {
+      setExtEndDate(tomorrowStr);
+      setExtEndTime("18:00");
+    }
+  };
+
+  // Handle saving deadline extension
+  const handleSaveExtension = async () => {
+    if (!extendingSubmission || isExtending) return;
+    if (!extEndDate || !extEndTime) {
+      alert("Please select both a new End Date and End Time.");
+      return;
+    }
+
+    const newEnd = new Date(`${extEndDate}T${extEndTime}`);
+    if (isNaN(newEnd.getTime())) {
+      alert("Invalid End Date or Time.");
+      return;
+    }
+
+    if (extendingSubmission.startAt) {
+      const start = new Date(extendingSubmission.startAt);
+      if (newEnd.getTime() <= start.getTime()) {
+        alert("New End Date & Time must be strictly after the Start Date & Time.");
+        return;
+      }
+    }
+
+    setIsExtending(true);
+    try {
+      const success = await extendDeadline(
+        extendingSubmission.id,
+        newEnd.toISOString()
+      );
+      if (success) {
+        setExtSuccess(true);
+        setTimeout(() => {
+          setExtendingSubmission(null);
+          setExtSuccess(false);
+        }, 2000);
+      }
+    } finally {
+      setIsExtending(false);
+    }
+  };
+
   // Filter recent submissions for this activity
   const relevantSubmissions = submissions.filter((s) => s.type === activityType);
+
+  const formatDisplayDateTime = (dateStr?: string | null) => {
+    if (!dateStr) return "—";
+    try {
+      const d = new Date(dateStr);
+      return d.toLocaleDateString("en-US", { month: "short", day: "numeric" }) + ", " + d.toLocaleTimeString("en-US", { hour: "numeric", minute: "2-digit", hour12: true });
+    } catch {
+      return dateStr;
+    }
+  };
 
   return (
     <div className="space-y-8 animate-fade-in">
@@ -153,7 +258,7 @@ export const QuizConfiguration: React.FC<QuizConfigurationProps> = ({
           <div>
             <span className="font-bold block">Submitted for Approval!</span>
             <span className="text-xs text-emerald-300">
-              Your {activityType} configuration and CSV set have been routed to the Admin Approval Queue (Status: Pending Approval).
+              Your {activityType} configuration, schedule, and CSV set have been routed to the Admin Approval Queue (Status: Pending Approval).
             </span>
           </div>
         </div>
@@ -275,6 +380,85 @@ export const QuizConfiguration: React.FC<QuizConfigurationProps> = ({
                     <option value={60}>60 Minutes</option>
                   </select>
                 </div>
+              </div>
+
+              {/* Step 1.1: Activity Schedule / Timeline Settings */}
+              <div className="pt-4 border-t border-white/10 space-y-4">
+                <div className="flex items-center justify-between">
+                  <div className="flex items-center space-x-2">
+                    <Calendar className="w-4 h-4 text-[#22D3EE]" />
+                    <h4 className="text-sm font-bold text-[#F8FAFC]">
+                      Activity Schedule & Automatic Timeline
+                    </h4>
+                  </div>
+                  <span className="text-[10px] font-mono text-[#94A3B8] uppercase">
+                    MongoDB Persisted
+                  </span>
+                </div>
+
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                  {/* Start Date & Time */}
+                  <div className="p-3.5 rounded-xl bg-[#07111F] border border-white/10 space-y-2.5">
+                    <span className="text-xs font-semibold text-[#22D3EE] block">
+                      Starting Date & Time (Opens at)
+                    </span>
+                    <div className="grid grid-cols-2 gap-2">
+                      <div>
+                        <label className="block text-[10px] font-mono text-[#94A3B8] mb-1">Date</label>
+                        <input
+                          type="date"
+                          required
+                          value={startDate}
+                          onChange={(e) => setStartDate(e.target.value)}
+                          className="w-full h-9 px-2.5 rounded-lg bg-[#0D1B2A] border border-white/15 text-[#F8FAFC] text-xs focus:outline-none focus:border-[#0078D4]"
+                        />
+                      </div>
+                      <div>
+                        <label className="block text-[10px] font-mono text-[#94A3B8] mb-1">Time</label>
+                        <input
+                          type="time"
+                          required
+                          value={startTime}
+                          onChange={(e) => setStartTime(e.target.value)}
+                          className="w-full h-9 px-2.5 rounded-lg bg-[#0D1B2A] border border-white/15 text-[#F8FAFC] text-xs focus:outline-none focus:border-[#0078D4]"
+                        />
+                      </div>
+                    </div>
+                  </div>
+
+                  {/* End Date & Time */}
+                  <div className="p-3.5 rounded-xl bg-[#07111F] border border-white/10 space-y-2.5">
+                    <span className="text-xs font-semibold text-red-400 block">
+                      Ending Date & Time (Closes at)
+                    </span>
+                    <div className="grid grid-cols-2 gap-2">
+                      <div>
+                        <label className="block text-[10px] font-mono text-[#94A3B8] mb-1">Date</label>
+                        <input
+                          type="date"
+                          required
+                          value={endDate}
+                          onChange={(e) => setEndDate(e.target.value)}
+                          className="w-full h-9 px-2.5 rounded-lg bg-[#0D1B2A] border border-white/15 text-[#F8FAFC] text-xs focus:outline-none focus:border-[#0078D4]"
+                        />
+                      </div>
+                      <div>
+                        <label className="block text-[10px] font-mono text-[#94A3B8] mb-1">Time</label>
+                        <input
+                          type="time"
+                          required
+                          value={endTime}
+                          onChange={(e) => setEndTime(e.target.value)}
+                          className="w-full h-9 px-2.5 rounded-lg bg-[#0D1B2A] border border-white/15 text-[#F8FAFC] text-xs focus:outline-none focus:border-[#0078D4]"
+                        />
+                      </div>
+                    </div>
+                  </div>
+                </div>
+
+                <p className="text-[11px] text-[#94A3B8] leading-relaxed">
+                  Students Corner automatically transitions from <strong className="text-amber-300">Upcoming</strong> → <strong className="text-emerald-300">Open</strong> → <strong className="text-red-300">Closed</strong> based on server time. You can extend the deadline later without requiring Admin re-approval.
+                </p>
               </div>
             </div>
 
@@ -398,10 +582,24 @@ export const QuizConfiguration: React.FC<QuizConfigurationProps> = ({
                 </span>
               </div>
 
-              <div className="flex justify-between py-1.5">
+              <div className="flex justify-between py-1.5 border-b border-white/5">
                 <span className="text-[#94A3B8]">Timer Duration:</span>
                 <span className="font-semibold text-[#22D3EE] font-mono">
                   {timerMinutes} minutes
+                </span>
+              </div>
+
+              <div className="flex justify-between py-1.5 border-b border-white/5">
+                <span className="text-[#94A3B8]">Start Schedule:</span>
+                <span className="font-semibold text-[#22D3EE] font-mono">
+                  {startDate} {startTime}
+                </span>
+              </div>
+
+              <div className="flex justify-between py-1.5">
+                <span className="text-[#94A3B8]">End Schedule:</span>
+                <span className="font-semibold text-red-400 font-mono">
+                  {endDate} {endTime}
                 </span>
               </div>
             </div>
@@ -429,11 +627,14 @@ export const QuizConfiguration: React.FC<QuizConfigurationProps> = ({
                 relevantSubmissions.map((sub) => (
                   <div
                     key={sub.id}
-                    className="p-3 rounded-xl bg-[#07111F] border border-white/10 space-y-1.5 text-xs"
+                    className="p-3 rounded-xl bg-[#07111F] border border-white/10 space-y-2 text-xs"
                   >
                     <div className="flex items-center justify-between">
                       <span className="font-semibold text-[#F8FAFC] truncate">
                         {sub.title}
+                        {(sub.revisionNumber || 0) > 0 && (
+                          <span className="ml-1.5 text-purple-400 text-[10px] font-mono">(Rev #{sub.revisionNumber})</span>
+                        )}
                       </span>
                       {sub.status === "Pending Approval" && (
                         <span className="px-2 py-0.5 rounded text-[10px] font-semibold bg-amber-500/10 text-amber-400 border border-amber-500/20">
@@ -445,11 +646,49 @@ export const QuizConfiguration: React.FC<QuizConfigurationProps> = ({
                           Approved
                         </span>
                       )}
+                      {sub.status === "Pending Re-Approval" && (
+                        <span className="px-2 py-0.5 rounded text-[10px] font-semibold bg-purple-500/10 text-purple-400 border border-purple-500/20">
+                          Re-Approval
+                        </span>
+                      )}
+                      {sub.status === "Rejected" && (
+                        <span className="px-2 py-0.5 rounded text-[10px] font-semibold bg-red-500/10 text-red-400 border border-red-500/20">
+                          Rejected
+                        </span>
+                      )}
+                      {sub.status === "Archived" && (
+                        <span className="px-2 py-0.5 rounded text-[10px] font-semibold bg-slate-500/10 text-slate-400 border border-slate-500/20">
+                          Archived
+                        </span>
+                      )}
                     </div>
+
+                    {/* Timeline Info Display */}
+                    {(sub.startAt || sub.endAt) && (
+                      <div className="p-2 rounded-lg bg-white/[0.02] border border-white/5 space-y-0.5 text-[11px] font-mono text-[#94A3B8]">
+                        {sub.startAt && <div>Starts: <span className="text-[#22D3EE]">{formatDisplayDateTime(sub.startAt)}</span></div>}
+                        {sub.endAt && <div>Ends: <span className="text-red-400">{formatDisplayDateTime(sub.endAt)}</span></div>}
+                      </div>
+                    )}
+
                     <div className="flex items-center justify-between text-[11px] text-[#94A3B8] font-mono">
                       <span>{sub.csvFileName}</span>
                       <span>{sub.submittedDate}</span>
                     </div>
+
+                    {/* Extend Deadline Quick Action for Approved submissions */}
+                    {sub.status === "Approved" && (
+                      <div className="pt-1.5 border-t border-white/5 flex justify-end">
+                        <button
+                          type="button"
+                          onClick={() => handleOpenExtend(sub)}
+                          className="text-[11px] font-semibold text-[#22D3EE] hover:underline flex items-center space-x-1"
+                        >
+                          <Clock className="w-3 h-3" />
+                          <span>Extend Deadline</span>
+                        </button>
+                      </div>
+                    )}
                   </div>
                 ))
               )}
@@ -457,6 +696,104 @@ export const QuizConfiguration: React.FC<QuizConfigurationProps> = ({
           </div>
         </div>
       </div>
+
+      {/* Extend Deadline Modal */}
+      {extendingSubmission && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/80 backdrop-blur-md animate-fade-in">
+          <div className="w-full max-w-md rounded-2xl bg-[#0D1B2A] border border-white/15 p-6 shadow-2xl space-y-5 relative max-h-[90vh] overflow-y-auto">
+            <div className="flex items-center justify-between pb-3 border-b border-white/10">
+              <div className="flex items-center space-x-2">
+                <Clock className="w-5 h-5 text-[#22D3EE]" />
+                <h3 className="text-base font-bold text-[#F8FAFC]">Extend Activity Deadline</h3>
+              </div>
+              <button
+                onClick={() => setExtendingSubmission(null)}
+                className="p-1 rounded-lg text-[#94A3B8] hover:text-white hover:bg-white/10"
+                disabled={isExtending}
+              >
+                <X className="w-5 h-5" />
+              </button>
+            </div>
+
+            {extSuccess ? (
+              <div className="py-6 text-center space-y-3">
+                <div className="w-12 h-12 rounded-full bg-emerald-500/10 border border-emerald-500/30 flex items-center justify-center mx-auto text-emerald-400">
+                  <CheckCircle2 className="w-6 h-6" />
+                </div>
+                <h4 className="text-base font-bold text-[#F8FAFC]">Deadline Extended!</h4>
+                <p className="text-xs text-[#CBD5E1]">
+                  The new deadline has been persisted to MongoDB. Students Corner reflects this change immediately without requiring Admin re-approval.
+                </p>
+              </div>
+            ) : (
+              <>
+                <div className="p-3 rounded-xl bg-[#0078D4]/10 border border-[#0078D4]/20 text-[#22D3EE] text-xs leading-relaxed">
+                  <strong>Timeline-Only Update:</strong> Modifying the deadline does <strong>not</strong> create a new revision and does <strong>not</strong> require Admin approval.
+                </div>
+
+                <div className="space-y-3 text-xs">
+                  <div>
+                    <span className="text-[#94A3B8] block text-[10px] font-mono uppercase">Activity</span>
+                    <span className="font-semibold text-white">{extendingSubmission.title}</span>
+                  </div>
+
+                  {extendingSubmission.startAt && (
+                    <div>
+                      <span className="text-[#94A3B8] block text-[10px] font-mono uppercase">Starting Time</span>
+                      <span className="font-mono text-[#CBD5E1]">{formatDisplayDateTime(extendingSubmission.startAt)}</span>
+                    </div>
+                  )}
+
+                  <div className="pt-2 border-t border-white/10 space-y-2">
+                    <label className="block text-xs font-semibold text-[#F8FAFC]">
+                      New Ending Date & Time
+                    </label>
+                    <div className="grid grid-cols-2 gap-2">
+                      <div>
+                        <label className="block text-[10px] font-mono text-[#94A3B8] mb-1">Date</label>
+                        <input
+                          type="date"
+                          value={extEndDate}
+                          onChange={(e) => setExtEndDate(e.target.value)}
+                          className="w-full h-9 px-2.5 rounded-lg bg-[#07111F] border border-white/15 text-[#F8FAFC] text-xs focus:outline-none focus:border-[#0078D4]"
+                        />
+                      </div>
+                      <div>
+                        <label className="block text-[10px] font-mono text-[#94A3B8] mb-1">Time</label>
+                        <input
+                          type="time"
+                          value={extEndTime}
+                          onChange={(e) => setExtEndTime(e.target.value)}
+                          className="w-full h-9 px-2.5 rounded-lg bg-[#07111F] border border-white/15 text-[#F8FAFC] text-xs focus:outline-none focus:border-[#0078D4]"
+                        />
+                      </div>
+                    </div>
+                  </div>
+                </div>
+
+                <div className="pt-3 border-t border-white/10 flex items-center justify-end space-x-3">
+                  <Button
+                    variant="ghost"
+                    size="sm"
+                    onClick={() => setExtendingSubmission(null)}
+                    disabled={isExtending}
+                  >
+                    Cancel
+                  </Button>
+                  <Button
+                    variant="primary"
+                    size="sm"
+                    onClick={handleSaveExtension}
+                    disabled={isExtending}
+                  >
+                    {isExtending ? "Updating..." : "Update Deadline"}
+                  </Button>
+                </div>
+              </>
+            )}
+          </div>
+        </div>
+      )}
     </div>
   );
 };

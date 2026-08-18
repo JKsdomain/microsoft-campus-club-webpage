@@ -17,6 +17,7 @@ export async function GET() {
         GENERAL_QUIZ: "General Quiz",
         PLACEMENT_QUESTIONS: "Placement Questions",
         FEED: "Feed Community",
+        TECHNICAL_GAMES: "Technical Games",
       };
       // Map DB status enum back to UI display names
       const statusMap: Record<string, string> = {
@@ -24,6 +25,8 @@ export async function GET() {
         APPROVED: "Approved",
         REJECTED: "Rejected",
         DRAFT: "Pending",
+        PENDING_REAPPROVAL: "Pending Re-Approval",
+        ARCHIVED: "Archived",
       };
 
       return {
@@ -51,6 +54,15 @@ export async function GET() {
         mediaPublicId: p.mediaPublicId || "",
         likesCount: p.likesCount || 0,
         dislikesCount: p.dislikesCount || 0,
+        // Revision metadata
+        revisionNumber: p.revisionNumber || 0,
+        parentId: p.parentId ? String(p.parentId) : null,
+        isActive: p.isActive !== undefined ? p.isActive : true,
+        revisionComment: p.revisionComment || "",
+        isRevision: (p.revisionNumber || 0) > 0,
+        // Timeline metadata (General Quiz & Placement Questions)
+        startAt: p.startAt ? new Date(p.startAt).toISOString() : null,
+        endAt: p.endAt ? new Date(p.endAt).toISOString() : null,
       };
     });
 
@@ -65,7 +77,7 @@ export async function GET() {
 }
 
 // POST /api/admin/proposals
-// OB submits a new proposal (Quiz, Placement, or Feed Community).
+// OB submits a new proposal (Quiz, Placement, Feed Community, or Technical Games).
 export async function POST(req: Request) {
   try {
     await dbConnect();
@@ -87,6 +99,8 @@ export async function POST(req: Request) {
       mediaType,
       mediaUrl,
       mediaPublicId,
+      startAt,
+      endAt,
     } = body;
 
     if (!type || !submittedBy) {
@@ -101,9 +115,33 @@ export async function POST(req: Request) {
       "General Quiz": "GENERAL_QUIZ",
       "Placement Questions": "PLACEMENT_QUESTIONS",
       "Feed Community": "FEED",
+      "Technical Games": "TECHNICAL_GAMES",
     };
 
     const dbType = typeMap[type] || type;
+
+    // Timeline validation for General Quiz & Placement Questions
+    let parsedStartAt: Date | null = null;
+    let parsedEndAt: Date | null = null;
+    if (dbType === "GENERAL_QUIZ" || dbType === "PLACEMENT_QUESTIONS") {
+      if (startAt && endAt) {
+        parsedStartAt = new Date(startAt);
+        parsedEndAt = new Date(endAt);
+        if (isNaN(parsedStartAt.getTime()) || isNaN(parsedEndAt.getTime())) {
+          return NextResponse.json(
+            { message: "Invalid date format for Start or End date/time." },
+            { status: 400 }
+          );
+        }
+        if (parsedEndAt.getTime() <= parsedStartAt.getTime()) {
+          return NextResponse.json(
+            { message: "End date/time must be strictly after Start date/time." },
+            { status: 400 }
+          );
+        }
+      }
+    }
+
     const finalDetails = details || content || "";
     const generatedTitle =
       title ||
@@ -136,6 +174,9 @@ export async function POST(req: Request) {
       mediaPublicId: mediaPublicId || "",
       likesCount: 0,
       dislikesCount: 0,
+      // Timeline fields
+      startAt: parsedStartAt,
+      endAt: parsedEndAt,
     });
 
     // Audit log
@@ -153,6 +194,7 @@ export async function POST(req: Request) {
       GENERAL_QUIZ: "General Quiz",
       PLACEMENT_QUESTIONS: "Placement Questions",
       FEED: "Feed Community",
+      TECHNICAL_GAMES: "Technical Games",
     };
 
     const formatted = {
@@ -176,6 +218,8 @@ export async function POST(req: Request) {
       mediaPublicId: proposal.mediaPublicId,
       likesCount: 0,
       dislikesCount: 0,
+      startAt: proposal.startAt ? new Date(proposal.startAt).toISOString() : null,
+      endAt: proposal.endAt ? new Date(proposal.endAt).toISOString() : null,
     };
 
     return NextResponse.json({ message: "Proposal submitted.", proposal: formatted }, { status: 201 });
@@ -189,13 +233,13 @@ export async function POST(req: Request) {
 }
 
 // PUT /api/admin/proposals
-// Admin approves or rejects a proposal, or student/OB likes/dislikes a feed post.
-// Body: { id: string, action: "approve" | "reject" | "vote", rejectionReason?: string, vote?: "like" | "dislike", currentVote?: "like" | "dislike" | null }
+// Admin approves, rejects, votes, or OB creates a revision of a proposal.
+// Body: { id: string, action: 'approve' | 'reject' | 'vote' | 'revise', revisionComment?: string, changes?: any, rejectionReason?: string, vote?: 'like' | 'dislike', currentVote?: 'like' | 'dislike' | null }
 export async function PUT(req: Request) {
   try {
     await dbConnect();
     const body = await req.json();
-    const { id, action, rejectionReason, vote, currentVote } = body;
+    const { id, action, rejectionReason, vote, currentVote, revisionComment, changes } = body;
 
     if (!id || !action) {
       return NextResponse.json(
@@ -212,30 +256,142 @@ export async function PUT(req: Request) {
       );
     }
 
-    if (action === "approve") {
-      proposal.status = "APPROVED";
-      proposal.reviewedAt = new Date();
-      await proposal.save();
+    // ----- REVISION CREATION (OB edits a published/approved activity) -----
+    if (action === "revise") {
+      if (proposal.status !== "APPROVED") {
+        return NextResponse.json({ message: "Only approved/published proposals can be revised." }, { status: 400 });
+      }
+
+      // Prevent multiple pending revisions for the same parent
+      const existingPendingRevision = await ProposalModel.findOne({
+        parentId: proposal._id,
+        status: "PENDING_REAPPROVAL",
+      });
+      if (existingPendingRevision) {
+        return NextResponse.json({
+          message: "A pending revision already exists for this activity. Wait for admin review before submitting another.",
+        }, { status: 409 });
+      }
+
+      // Create new revision document — clone the parent and overlay changes
+      const parentObj = proposal.toObject();
+      delete parentObj._id;
+      delete parentObj.__v;
+      delete parentObj.createdAt;
+      delete parentObj.updatedAt;
+
+      const newRevision = new ProposalModel({
+        ...parentObj,
+        ...changes,
+        status: "PENDING_REAPPROVAL",
+        revisionNumber: (proposal.revisionNumber || 0) + 1,
+        parentId: proposal._id,
+        revisionComment: revisionComment || "",
+        isActive: false, // NOT active until admin approves
+        submittedAt: new Date(),
+        reviewedAt: null,
+        reviewedBy: null,
+        rejectionReason: null,
+      });
+      await newRevision.save();
 
       await AuditLog.create({
-        actorType: "ADMIN",
-        action: `Approved proposal: "${proposal.title}"`,
+        actorType: "OFFICE_BEARER",
+        action: `Submitted revision #${newRevision.revisionNumber} for re-approval: "${proposal.title}"`,
         module: "Approval Workflow",
-        targetId: proposal._id,
-        metadata: { action, proposalType: proposal.type },
+        targetId: newRevision._id,
+        metadata: { parentId: String(proposal._id), revisionNumber: newRevision.revisionNumber, revisionComment },
       });
 
-      console.log(`✅ [MONGODB ATLAS] Proposal ${id} Approved`);
+      console.log(`✅ [MONGODB ATLAS] Revision #${newRevision.revisionNumber} created for proposal ${proposal._id}`);
 
       return NextResponse.json({
-        message: "Proposal approved in MongoDB.",
-        proposal: {
-          id: String(proposal._id),
-          status: "Approved",
-        },
-      });
+        message: "Revision created and submitted for re-approval.",
+        revisionId: String(newRevision._id),
+        revisionNumber: newRevision.revisionNumber,
+      }, { status: 201 });
+    }
+
+    // ----- APPROVAL -----
+    if (action === "approve") {
+      const isRevision = proposal.status === "PENDING_REAPPROVAL" && proposal.parentId;
+
+      if (isRevision) {
+        // --- REVISION APPROVAL: Archive old, publish new ---
+        const parentProposal = await ProposalModel.findById(proposal.parentId);
+
+        if (!parentProposal) {
+          return NextResponse.json({ message: "Parent proposal not found for this revision." }, { status: 404 });
+        }
+
+        // Archive the old published version
+        parentProposal.status = "ARCHIVED";
+        parentProposal.isActive = false;
+        await parentProposal.save();
+
+        // Publish the new revision
+        proposal.status = "APPROVED";
+        proposal.isActive = true;
+        proposal.reviewedAt = new Date();
+        await proposal.save();
+
+        // Audit logs
+        await AuditLog.create({
+          actorType: "ADMIN",
+          action: `Archived old version of: "${parentProposal.title}" (replaced by revision #${proposal.revisionNumber})`,
+          module: "Approval Workflow",
+          targetId: parentProposal._id,
+          metadata: { action: "archive", replacedBy: String(proposal._id), revisionNumber: proposal.revisionNumber },
+        });
+
+        await AuditLog.create({
+          actorType: "ADMIN",
+          action: `Approved revision #${proposal.revisionNumber} for: "${proposal.title}"`,
+          module: "Approval Workflow",
+          targetId: proposal._id,
+          metadata: { action: "approve_revision", parentId: String(parentProposal._id), revisionNumber: proposal.revisionNumber },
+        });
+
+        console.log(`✅ [MONGODB ATLAS] Revision #${proposal.revisionNumber} of proposal ${proposal.parentId} approved. Old version archived.`);
+
+        return NextResponse.json({
+          message: "Revision approved. Old version archived, new version is now published.",
+          proposal: {
+            id: String(proposal._id),
+            status: "Approved",
+          },
+        });
+      } else {
+        // --- NORMAL APPROVAL (new submission) ---
+        proposal.status = "APPROVED";
+        proposal.reviewedAt = new Date();
+        proposal.isActive = true;
+        await proposal.save();
+
+        await AuditLog.create({
+          actorType: "ADMIN",
+          action: `Approved proposal: "${proposal.title}"`,
+          module: "Approval Workflow",
+          targetId: proposal._id,
+          metadata: { action, proposalType: proposal.type },
+        });
+
+        console.log(`✅ [MONGODB ATLAS] Proposal ${id} Approved`);
+
+        return NextResponse.json({
+          message: "Proposal approved in MongoDB.",
+          proposal: {
+            id: String(proposal._id),
+            status: "Approved",
+          },
+        });
+      }
     } else if (action === "reject") {
+      const isRevision = proposal.status === "PENDING_REAPPROVAL" && proposal.parentId;
+
+      // Set status to REJECTED — if revision, old version stays published
       proposal.status = "REJECTED";
+      proposal.isActive = false;
       proposal.reviewedAt = new Date();
       if (rejectionReason) {
         proposal.rejectionReason = rejectionReason;
@@ -244,16 +400,18 @@ export async function PUT(req: Request) {
 
       await AuditLog.create({
         actorType: "ADMIN",
-        action: `Rejected proposal: "${proposal.title}"`,
+        action: `Rejected ${isRevision ? `revision #${proposal.revisionNumber} for` : "proposal:"} "${proposal.title}"`,
         module: "Approval Workflow",
         targetId: proposal._id,
-        metadata: { action, proposalType: proposal.type },
+        metadata: { action, proposalType: proposal.type, isRevision: !!isRevision, parentId: proposal.parentId ? String(proposal.parentId) : null },
       });
 
-      console.log(`✅ [MONGODB ATLAS] Proposal ${id} Rejected`);
+      console.log(`✅ [MONGODB ATLAS] ${isRevision ? "Revision" : "Proposal"} ${id} Rejected`);
 
       return NextResponse.json({
-        message: "Proposal rejected in MongoDB.",
+        message: isRevision
+          ? "Revision rejected. The currently published version remains active."
+          : "Proposal rejected in MongoDB.",
         proposal: {
           id: String(proposal._id),
           status: "Rejected",
@@ -287,7 +445,7 @@ export async function PUT(req: Request) {
       });
     } else {
       return NextResponse.json(
-        { message: "Invalid action. Use 'approve', 'reject', or 'vote'." },
+        { message: "Invalid action. Use 'approve', 'reject', 'vote', or 'revise'." },
         { status: 400 }
       );
     }

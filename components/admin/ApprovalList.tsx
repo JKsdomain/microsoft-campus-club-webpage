@@ -5,20 +5,25 @@ import { Proposal } from "@/lib/adminState";
 import { useAdminAuth } from "./AdminAuthProvider";
 import { Button } from "../ui/Button";
 import { ProposalReviewModal } from "./ProposalReviewModal";
+import { RefreshCw } from "lucide-react";
 
 export const ApprovalList: React.FC = () => {
   const { proposals, approveProposal, rejectProposal } = useAdminAuth();
-  const [filterStatus, setFilterStatus] = useState<"Pending" | "Approved" | "Rejected" | "All">("Pending");
+  const [filterStatus, setFilterStatus] = useState<"Pending" | "Pending Re-Approval" | "Approved" | "Rejected" | "Archived" | "All">("Pending");
   const [selectedProposal, setSelectedProposal] = useState<Proposal | null>(null);
 
   const filteredProposals = proposals.filter((p) => {
     if (filterStatus === "All") return true;
+    // Group both "Pending" statuses together when filtering for "Pending"
+    if (filterStatus === "Pending") return p.status === "Pending" || p.status === "Pending Re-Approval";
     return p.status === filterStatus;
   });
 
   const pendingCount = proposals.filter((p) => p.status === "Pending").length;
+  const reApprovalCount = proposals.filter((p) => p.status === "Pending Re-Approval").length;
   const approvedCount = proposals.filter((p) => p.status === "Approved").length;
   const rejectedCount = proposals.filter((p) => p.status === "Rejected").length;
+  const archivedCount = proposals.filter((p) => p.status === "Archived").length;
 
   return (
     <div className="space-y-6">
@@ -32,7 +37,12 @@ export const ApprovalList: React.FC = () => {
               : "bg-[#0D1B2A] text-[#94A3B8] hover:text-white border border-white/10"
           }`}
         >
-          Pending Review ({pendingCount})
+          Pending Review ({pendingCount + reApprovalCount})
+          {reApprovalCount > 0 && (
+            <span className="ml-1.5 px-1.5 py-0.5 rounded text-[10px] bg-purple-500/20 text-purple-300">
+              {reApprovalCount} revisions
+            </span>
+          )}
         </button>
 
         <button
@@ -56,6 +66,19 @@ export const ApprovalList: React.FC = () => {
         >
           Rejected ({rejectedCount})
         </button>
+
+        {archivedCount > 0 && (
+          <button
+            onClick={() => setFilterStatus("Archived")}
+            className={`px-4 py-2 rounded-xl text-xs font-semibold transition-all ${
+              filterStatus === "Archived"
+                ? "bg-slate-600 text-white shadow-md"
+                : "bg-[#0D1B2A] text-[#94A3B8] hover:text-white border border-white/10"
+            }`}
+          >
+            Archived ({archivedCount})
+          </button>
+        )}
 
         <button
           onClick={() => setFilterStatus("All")}
@@ -98,9 +121,17 @@ export const ApprovalList: React.FC = () => {
                   >
                     {/* Type */}
                     <td className="px-6 py-4">
-                      <span className="inline-block text-xs font-semibold px-2.5 py-1 rounded-md bg-[#0078D4]/10 border border-[#0078D4]/20 text-[#22D3EE]">
-                        {item.type}
-                      </span>
+                      <div className="flex items-center gap-2">
+                        <span className="inline-block text-xs font-semibold px-2.5 py-1 rounded-md bg-[#0078D4]/10 border border-[#0078D4]/20 text-[#22D3EE]">
+                          {item.type}
+                        </span>
+                        {item.isRevision && (
+                          <span className="inline-flex items-center gap-1 text-[10px] font-semibold px-2 py-0.5 rounded-md bg-purple-500/10 border border-purple-500/20 text-purple-400">
+                            <RefreshCw className="w-3 h-3" />
+                            Rev #{item.revisionNumber}
+                          </span>
+                        )}
+                      </div>
                     </td>
 
                     {/* Title */}
@@ -125,6 +156,12 @@ export const ApprovalList: React.FC = () => {
                           Pending
                         </span>
                       )}
+                      {item.status === "Pending Re-Approval" && (
+                        <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-xs font-semibold bg-purple-500/10 text-purple-400 border border-purple-500/20">
+                          <RefreshCw className="w-3 h-3" />
+                          Re-Approval
+                        </span>
+                      )}
                       {item.status === "Approved" && (
                         <span className="inline-flex items-center px-2.5 py-1 rounded-full text-xs font-semibold bg-emerald-500/10 text-emerald-400 border border-emerald-500/20">
                           Approved
@@ -133,6 +170,11 @@ export const ApprovalList: React.FC = () => {
                       {item.status === "Rejected" && (
                         <span className="inline-flex items-center px-2.5 py-1 rounded-full text-xs font-semibold bg-red-500/10 text-red-400 border border-red-500/20">
                           Rejected
+                        </span>
+                      )}
+                      {item.status === "Archived" && (
+                        <span className="inline-flex items-center px-2.5 py-1 rounded-full text-xs font-semibold bg-slate-500/10 text-slate-400 border border-slate-500/20">
+                          Archived
                         </span>
                       )}
                     </td>

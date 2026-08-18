@@ -28,7 +28,7 @@ export const TechnicalGamesManager: React.FC = () => {
     e.preventDefault();
 
     submitQuizProposal({
-      type: "General Quiz", // reuse proposal queue mechanism
+      type: "General Quiz", // Uses General Quiz type in the proposal queue with [Technical Games] prefix
       title: `[Technical Games] ${gameTitle}`,
       questionsToUpload: maxTeams,
       questionsToDisplay: maxTeams,

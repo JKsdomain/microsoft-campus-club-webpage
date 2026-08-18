@@ -1,10 +1,11 @@
 import { NextResponse } from "next/server";
 import { dbConnect } from "@/lib/db/dbConnect";
-import { SystemSetting } from "@/lib/db/models";
+import { SystemSetting, ProposalModel } from "@/lib/db/models";
 
 // POST /api/students-corner/validate-event
 // Body: { activityName: "Placement Questions" | "General Quiz" | "Technical Games" }
-// Validates whether the event is currently OPEN in MongoDB before allowing access/test start
+// Validates whether the event is currently OPEN in MongoDB before allowing access/test start.
+// Enforces server-side timeline verification (startAt, endAt) for General Quiz and Placement Questions.
 export async function POST(req: Request) {
   try {
     await dbConnect();
@@ -15,6 +16,57 @@ export async function POST(req: Request) {
       return NextResponse.json({ message: "activityName is required." }, { status: 400 });
     }
 
+    const now = new Date();
+
+    // 1. Check timeline on active approved proposal for General Quiz & Placement Questions
+    if (activityName === "General Quiz" || activityName === "Placement Questions") {
+      const dbType = activityName === "General Quiz" ? "GENERAL_QUIZ" : "PLACEMENT_QUESTIONS";
+      const activeProposal = await ProposalModel.findOne({
+        type: dbType,
+        status: "APPROVED",
+        isActive: true,
+      }).sort({ submittedAt: -1 });
+
+      if (activeProposal && activeProposal.startAt && activeProposal.endAt) {
+        const startAt = new Date(activeProposal.startAt);
+        const endAt = new Date(activeProposal.endAt);
+
+        if (now < startAt) {
+          return NextResponse.json(
+            {
+              allowed: false,
+              status: "UPCOMING",
+              message: `"${activityName}" has not started yet. (Starts at: ${startAt.toLocaleString()})`,
+              startAt: startAt.toISOString(),
+              endAt: endAt.toISOString(),
+            },
+            { status: 403 }
+          );
+        }
+
+        if (now > endAt) {
+          return NextResponse.json(
+            {
+              allowed: false,
+              status: "CLOSED",
+              message: `"${activityName}" has ended. (Closed at: ${endAt.toLocaleString()})`,
+              startAt: startAt.toISOString(),
+              endAt: endAt.toISOString(),
+            },
+            { status: 403 }
+          );
+        }
+
+        return NextResponse.json({
+          allowed: true,
+          status: "OPEN",
+          startAt: startAt.toISOString(),
+          endAt: endAt.toISOString(),
+        });
+      }
+    }
+
+    // 2. Base SystemSetting check for other activities or unconfigured timeline
     const setting = await SystemSetting.findOne({ key: "activityAvailability" });
     const availabilityMap: Record<string, string> = setting?.value || {
       "Placement Questions": "OPEN",
@@ -35,12 +87,12 @@ export async function POST(req: Request) {
       );
     }
 
-    if (currentStatus === "COMING SOON") {
+    if (currentStatus === "COMING SOON" || currentStatus === "UPCOMING") {
       return NextResponse.json(
         {
           allowed: false,
-          status: "COMING SOON",
-          message: `"${activityName}" is coming soon and is not currently active.`,
+          status: currentStatus,
+          message: `"${activityName}" is not currently active.`,
         },
         { status: 403 }
       );

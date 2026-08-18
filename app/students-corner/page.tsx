@@ -55,6 +55,7 @@ function StudentsCornerInner() {
 
   // Activity Availability State & Enforcement
   const [activityAvailability, setActivityAvailability] = useState<ActivityAvailabilityMap>(INITIAL_ACTIVITY_AVAILABILITY);
+  const [timelines, setTimelines] = useState<Record<string, { startAt?: string | null; endAt?: string | null; title?: string }>>({});
   const [blockedMessage, setBlockedMessage] = useState<string | null>(null);
   const [testInfoPreviewOpen, setTestInfoPreviewOpen] = useState(false);
 
@@ -66,9 +67,22 @@ function StudentsCornerInner() {
         if (data.activityAvailability) {
           setActivityAvailability(data.activityAvailability);
         }
+        if (data.timelines) {
+          setTimelines(data.timelines);
+        }
       }
     } catch (e) {
       console.error("Failed to fetch activity availability", e);
+    }
+  };
+
+  const formatTimelineDisplay = (dateStr?: string | null) => {
+    if (!dateStr) return "";
+    try {
+      const d = new Date(dateStr);
+      return d.toLocaleDateString("en-US", { month: "short", day: "numeric" }) + ", " + d.toLocaleTimeString("en-US", { hour: "numeric", minute: "2-digit", hour12: true });
+    } catch {
+      return dateStr || "";
     }
   };
 
@@ -97,12 +111,14 @@ function StudentsCornerInner() {
     const status = activityAvailability[testType] || "OPEN";
 
     if (status === "CLOSED") {
-      setBlockedMessage(`"${testType}" is currently closed by the administrator.`);
+      const endText = timelines[testType]?.endAt ? ` (Closed at ${formatTimelineDisplay(timelines[testType]?.endAt)})` : "";
+      setBlockedMessage(`"${testType}" is currently closed.${endText}`);
       return;
     }
 
-    if (status === "COMING SOON") {
-      setBlockedMessage(`"${testType}" is not available yet.`);
+    if (status === "COMING SOON" || status === "UPCOMING") {
+      const startText = timelines[testType]?.startAt ? ` (Opens at ${formatTimelineDisplay(timelines[testType]?.startAt)})` : "";
+      setBlockedMessage(`"${testType}" has not started yet.${startText}`);
       return;
     }
 
@@ -214,6 +230,7 @@ function StudentsCornerInner() {
               {/* Card 1: Placement Questions */}
               {(() => {
                 const status = activityAvailability["Placement Questions"] || "OPEN";
+                const timeline = timelines["Placement Questions"];
                 return (
                   <div className="p-6 rounded-2xl bg-[#0D1B2A] border border-white/10 shadow-xl flex flex-col justify-between space-y-4 hover:border-[#0078D4]/40 transition-all">
                     <div className="space-y-3">
@@ -233,16 +250,32 @@ function StudentsCornerInner() {
                             CLOSED
                           </span>
                         )}
-                        {status === "COMING SOON" && (
+                        {(status === "COMING SOON" || status === "UPCOMING") && (
                           <span className="inline-flex items-center gap-1 text-[11px] font-semibold text-amber-400 bg-amber-500/10 px-2.5 py-0.5 rounded-full border border-amber-500/20">
                             <span className="w-1.5 h-1.5 rounded-full bg-amber-400" />
-                            COMING SOON
+                            {status === "UPCOMING" ? "UPCOMING" : "COMING SOON"}
                           </span>
                         )}
                       </div>
                       <div>
                         <span className="text-[11px] font-mono text-[#0078D4] block mb-0.5">Placement Challenge</span>
                         <h3 className="text-lg font-bold text-[#F8FAFC]">Placement Questions</h3>
+                        {/* Timeline Information */}
+                        {status === "OPEN" && timeline?.endAt && (
+                          <span className="text-[11px] font-mono text-emerald-400 block mt-0.5">
+                            Ends: {formatTimelineDisplay(timeline.endAt)}
+                          </span>
+                        )}
+                        {status === "UPCOMING" && timeline?.startAt && (
+                          <span className="text-[11px] font-mono text-amber-400 block mt-0.5">
+                            Starts: {formatTimelineDisplay(timeline.startAt)}
+                          </span>
+                        )}
+                        {status === "CLOSED" && timeline?.endAt && (
+                          <span className="text-[11px] font-mono text-red-400 block mt-0.5">
+                            Ended: {formatTimelineDisplay(timeline.endAt)}
+                          </span>
+                        )}
                       </div>
                       <p className="text-xs text-[#CBD5E1] leading-relaxed">
                         Practice interview coding sets (4 Questions • 30 Minutes) with email OTP verification and secure test environment.
@@ -252,9 +285,11 @@ function StudentsCornerInner() {
                       onClick={() => handleStartTestFlow("Placement Questions")}
                       variant="primary"
                       size="md"
+                      disabled={status === "CLOSED" || status === "UPCOMING" || status === "COMING SOON"}
                       rightIcon={<ArrowRight className="w-4 h-4" />}
+                      className={status !== "OPEN" ? "opacity-60 cursor-not-allowed" : ""}
                     >
-                      Start Placement Test
+                      {status === "OPEN" ? "Start Placement Test" : status === "UPCOMING" ? "Upcoming Assessment" : "Assessment Closed"}
                     </Button>
                   </div>
                 );
@@ -263,6 +298,7 @@ function StudentsCornerInner() {
               {/* Card 2: General Quiz */}
               {(() => {
                 const status = activityAvailability["General Quiz"] || "OPEN";
+                const timeline = timelines["General Quiz"];
                 return (
                   <div className="p-6 rounded-2xl bg-[#0D1B2A] border border-white/10 shadow-xl flex flex-col justify-between space-y-4 hover:border-[#0078D4]/40 transition-all">
                     <div className="space-y-3">
@@ -282,16 +318,32 @@ function StudentsCornerInner() {
                             CLOSED
                           </span>
                         )}
-                        {status === "COMING SOON" && (
+                        {(status === "COMING SOON" || status === "UPCOMING") && (
                           <span className="inline-flex items-center gap-1 text-[11px] font-semibold text-amber-400 bg-amber-500/10 px-2.5 py-0.5 rounded-full border border-amber-500/20">
                             <span className="w-1.5 h-1.5 rounded-full bg-amber-400" />
-                            COMING SOON
+                            {status === "UPCOMING" ? "UPCOMING" : "COMING SOON"}
                           </span>
                         )}
                       </div>
                       <div>
                         <span className="text-[11px] font-mono text-blue-400 block mb-0.5">Weekly Challenge</span>
                         <h3 className="text-lg font-bold text-[#F8FAFC]">General Quiz</h3>
+                        {/* Timeline Information */}
+                        {status === "OPEN" && timeline?.endAt && (
+                          <span className="text-[11px] font-mono text-emerald-400 block mt-0.5">
+                            Ends: {formatTimelineDisplay(timeline.endAt)}
+                          </span>
+                        )}
+                        {status === "UPCOMING" && timeline?.startAt && (
+                          <span className="text-[11px] font-mono text-amber-400 block mt-0.5">
+                            Starts: {formatTimelineDisplay(timeline.startAt)}
+                          </span>
+                        )}
+                        {status === "CLOSED" && timeline?.endAt && (
+                          <span className="text-[11px] font-mono text-red-400 block mt-0.5">
+                            Ended: {formatTimelineDisplay(timeline.endAt)}
+                          </span>
+                        )}
                       </div>
                       <p className="text-xs text-[#CBD5E1] leading-relaxed">
                         Timed trivia speed rounds (3 Questions • 15 Minutes) covering cloud fundamentals, AI models, and software engineering.
@@ -301,9 +353,11 @@ function StudentsCornerInner() {
                       onClick={() => handleStartTestFlow("General Quiz")}
                       variant="primary"
                       size="md"
+                      disabled={status === "CLOSED" || status === "UPCOMING" || status === "COMING SOON"}
                       rightIcon={<ArrowRight className="w-4 h-4" />}
+                      className={status !== "OPEN" ? "opacity-60 cursor-not-allowed" : ""}
                     >
-                      Take General Quiz
+                      {status === "OPEN" ? "Take General Quiz" : status === "UPCOMING" ? "Upcoming Quiz" : "Quiz Closed"}
                     </Button>
                   </div>
                 );
@@ -394,7 +448,30 @@ function StudentsCornerInner() {
                 <div>
                   <h3 className="text-2xl font-bold text-[#F8FAFC]">Placement Questions Closed</h3>
                   <p className="text-xs text-[#CBD5E1] mt-1.5 leading-relaxed">
-                    This assessment is currently closed by the administrator. Please check back later or explore other live MCC activities.
+                    {timelines["Placement Questions"]?.endAt
+                      ? `This assessment closed on ${formatTimelineDisplay(timelines["Placement Questions"]?.endAt)}. Please check back later for upcoming rounds.`
+                      : "This assessment is currently closed by the administrator. Please check back later or explore other live MCC activities."}
+                  </p>
+                </div>
+                <Button
+                  onClick={() => setActiveTab("overview")}
+                  variant="outline"
+                  size="md"
+                >
+                  Return to Overview
+                </Button>
+              </div>
+            ) : (activityAvailability["Placement Questions"] || "OPEN") === "UPCOMING" ? (
+              <div className="p-12 text-center rounded-2xl bg-[#0D1B2A] border border-amber-500/20 max-w-xl mx-auto space-y-5">
+                <div className="w-14 h-14 rounded-full bg-amber-500/10 border border-amber-500/30 text-amber-400 flex items-center justify-center mx-auto">
+                  <Clock className="w-7 h-7" />
+                </div>
+                <div>
+                  <h3 className="text-2xl font-bold text-[#F8FAFC]">Placement Questions Upcoming</h3>
+                  <p className="text-xs text-[#CBD5E1] mt-1.5 leading-relaxed">
+                    {timelines["Placement Questions"]?.startAt
+                      ? `This assessment will open on ${formatTimelineDisplay(timelines["Placement Questions"]?.startAt)}. Please check back at the scheduled start time.`
+                      : "This assessment is scheduled to open soon. Please check back later."}
                   </p>
                 </div>
                 <Button
@@ -413,6 +490,11 @@ function StudentsCornerInner() {
                   <p className="text-xs text-[#CBD5E1] mt-1">
                     {ACTIVE_PLACEMENT_SET.title} • {ACTIVE_PLACEMENT_SET.timerMinutes} Minutes
                   </p>
+                  {timelines["Placement Questions"]?.endAt && (
+                    <p className="text-xs text-emerald-400 mt-1 font-mono">
+                      Closes: {formatTimelineDisplay(timelines["Placement Questions"]?.endAt)}
+                    </p>
+                  )}
                 </div>
                 <Button
                   onClick={() => handleStartTestFlow("Placement Questions")}
@@ -444,7 +526,30 @@ function StudentsCornerInner() {
                 <div>
                   <h3 className="text-2xl font-bold text-[#F8FAFC]">General Quiz Closed</h3>
                   <p className="text-xs text-[#CBD5E1] mt-1.5 leading-relaxed">
-                    This quiz is currently closed by the administrator. Please check back later or explore other live MCC activities.
+                    {timelines["General Quiz"]?.endAt
+                      ? `This quiz closed on ${formatTimelineDisplay(timelines["General Quiz"]?.endAt)}. Please check back later for upcoming trivia challenges.`
+                      : "This quiz is currently closed by the administrator. Please check back later or explore other live MCC activities."}
+                  </p>
+                </div>
+                <Button
+                  onClick={() => setActiveTab("overview")}
+                  variant="outline"
+                  size="md"
+                >
+                  Return to Overview
+                </Button>
+              </div>
+            ) : (activityAvailability["General Quiz"] || "OPEN") === "UPCOMING" ? (
+              <div className="p-12 text-center rounded-2xl bg-[#0D1B2A] border border-amber-500/20 max-w-xl mx-auto space-y-5">
+                <div className="w-14 h-14 rounded-full bg-amber-500/10 border border-amber-500/30 text-amber-400 flex items-center justify-center mx-auto">
+                  <Clock className="w-7 h-7" />
+                </div>
+                <div>
+                  <h3 className="text-2xl font-bold text-[#F8FAFC]">General Quiz Upcoming</h3>
+                  <p className="text-xs text-[#CBD5E1] mt-1.5 leading-relaxed">
+                    {timelines["General Quiz"]?.startAt
+                      ? `This quiz will open on ${formatTimelineDisplay(timelines["General Quiz"]?.startAt)}. Please check back at the scheduled start time.`
+                      : "This quiz is scheduled to open soon. Please check back later."}
                   </p>
                 </div>
                 <Button
@@ -463,6 +568,11 @@ function StudentsCornerInner() {
                   <p className="text-xs text-[#CBD5E1] mt-1">
                     {ACTIVE_QUIZ_SET.title} • {ACTIVE_QUIZ_SET.timerMinutes} Minutes
                   </p>
+                  {timelines["General Quiz"]?.endAt && (
+                    <p className="text-xs text-emerald-400 mt-1 font-mono">
+                      Closes: {formatTimelineDisplay(timelines["General Quiz"]?.endAt)}
+                    </p>
+                  )}
                 </div>
                 <Button
                   onClick={() => handleStartTestFlow("General Quiz")}

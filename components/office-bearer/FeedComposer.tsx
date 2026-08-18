@@ -78,7 +78,7 @@ export const FeedComposer: React.FC = () => {
     }
   };
 
-  const pendingPosts = feedPosts.filter((p) => p.status === "Pending Approval");
+  const pendingPosts = feedPosts.filter((p) => p.status === "Pending Approval" || p.status === "Pending Re-Approval");
 
   return (
     <div className="space-y-8 animate-fade-in">
@@ -238,7 +238,7 @@ export const FeedComposer: React.FC = () => {
                         {post.authorName}
                       </span>
                       <span className="px-2 py-0.5 rounded text-[10px] font-semibold bg-amber-500/10 text-amber-400 border border-amber-500/20">
-                        Pending Approval
+                        {post.status === "Pending Re-Approval" ? "Re-Approval" : "Pending Approval"}
                       </span>
                     </div>
                     <p className="text-[#CBD5E1] line-clamp-2 italic">

@@ -360,10 +360,22 @@ export const AdminAuthProvider: React.FC<{ children: React.ReactNode }> = ({ chi
         body: JSON.stringify({ id, action: "approve" }),
       });
       if (res.ok) {
-        setProposals((prev) =>
-          prev.map((p) => (p.id === id ? { ...p, status: "Approved" } : p))
-        );
-        addAuditLog(`Approved Proposal (${target?.title})`, "Approval Workflow", "Success");
+        // Re-fetch all proposals to get correct state (revision approval may archive another proposal)
+        try {
+          const propRes = await fetch("/api/admin/proposals");
+          if (propRes.ok) {
+            const propData = await propRes.json();
+            if (Array.isArray(propData.proposals)) {
+              setProposals(propData.proposals);
+            }
+          }
+        } catch (e) {
+          // Fallback: optimistic update
+          setProposals((prev) =>
+            prev.map((p) => (p.id === id ? { ...p, status: "Approved" } : p))
+          );
+        }
+        addAuditLog(`Approved ${target?.isRevision ? 'Revision of ' : ''}Proposal (${target?.title})`, "Approval Workflow", "Success");
         console.log(`✅ [MONGODB] Proposal ${id} approved`);
       } else {
         console.error("❌ Failed to approve proposal");
@@ -387,7 +399,7 @@ export const AdminAuthProvider: React.FC<{ children: React.ReactNode }> = ({ chi
         setProposals((prev) =>
           prev.map((p) => (p.id === id ? { ...p, status: "Rejected" } : p))
         );
-        addAuditLog(`Rejected Proposal (${target?.title})`, "Approval Workflow", "Warning");
+        addAuditLog(`Rejected ${target?.isRevision ? 'Revision of ' : ''}Proposal (${target?.title})`, "Approval Workflow", "Warning");
         console.log(`✅ [MONGODB] Proposal ${id} rejected`);
       } else {
         console.error("❌ Failed to reject proposal");

@@ -19,11 +19,11 @@ export interface ActivityAssignment {
 
 export interface Proposal {
   id: string;
-  type: "Feed Community" | "General Quiz" | "Placement Questions";
+  type: "Feed Community" | "General Quiz" | "Placement Questions" | "Technical Games";
   title: string;
   submittedBy: string;
   submittedDate: string;
-  status: "Pending" | "Approved" | "Rejected";
+  status: "Pending" | "Approved" | "Rejected" | "Pending Re-Approval" | "Archived";
   details: string;
   authorDepartment?: string;
   mediaType?: "none" | "image" | "video";
@@ -31,6 +31,15 @@ export interface Proposal {
   mediaPublicId?: string;
   likesCount?: number;
   dislikesCount?: number;
+  // Revision fields
+  revisionNumber?: number;
+  parentId?: string | null;
+  isActive?: boolean;
+  revisionComment?: string;
+  isRevision?: boolean;
+  // Timeline fields (General Quiz & Placement Questions)
+  startAt?: string | null;
+  endAt?: string | null;
 }
 
 export interface AnnouncementPoster {
@@ -62,7 +71,7 @@ export interface AuditLog {
   status: "Success" | "Warning" | "Failure";
 }
 
-export type ActivityAvailabilityStatus = "OPEN" | "CLOSED" | "COMING SOON";
+export type ActivityAvailabilityStatus = "OPEN" | "CLOSED" | "COMING SOON" | "UPCOMING";
 
 export interface ActivityAvailabilityMap {
   [activityName: string]: ActivityAvailabilityStatus;

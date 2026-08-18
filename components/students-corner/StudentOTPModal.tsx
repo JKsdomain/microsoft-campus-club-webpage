@@ -25,6 +25,9 @@ export const StudentOTPModal: React.FC<StudentOTPModalProps> = ({
   const [countdown, setCountdown] = useState(60);
   const [attemptsLeft, setAttemptsLeft] = useState(5);
 
+  const [isSending, setIsSending] = useState(false);
+  const [isVerifying, setIsVerifying] = useState(false);
+
   useEffect(() => {
     let timer: NodeJS.Timeout;
     if (step === "otp" && countdown > 0) {
@@ -34,9 +37,6 @@ export const StudentOTPModal: React.FC<StudentOTPModalProps> = ({
   }, [step, countdown]);
 
   if (!isOpen) return null;
-
-  const [isSending, setIsSending] = useState(false);
-  const [isVerifying, setIsVerifying] = useState(false);
 
   const handleSendOTP = async (e: React.FormEvent) => {
     e.preventDefault();
