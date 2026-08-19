@@ -12,10 +12,36 @@ export interface PublicTestQuestion {
   options: string[];
 }
 
+export interface StudentInfo {
+  name: string;
+  department: string;
+  year: string;
+  section: string;
+  email: string;
+  rollNumber: string;
+}
+
+export const STUDENT_DEPARTMENTS = [
+  "Artificial Intelligence & Data Science",
+  "Computer Science & Engineering",
+  "Information Technology",
+  "Electronics & Communication",
+  "Electrical & Electronics",
+  "Mechanical Engineering",
+  "Civil Engineering",
+] as const;
+
+export const STUDENT_YEARS = ["1", "2", "3", "4"] as const;
+
 export interface StudentResultReport {
   attemptId: string;
   username: string;
   email: string;
+  studentInfo?: StudentInfo;
+  department?: string;
+  year?: string;
+  section?: string;
+  rollNumber?: string;
   testType: "Placement Questions" | "General Quiz";
   testTitle: string;
   score: number;
@@ -148,10 +174,26 @@ export function getPublicQuizQuestions(): PublicTestQuestion[] {
  * Server-side Score Calculation & Result Generation
  */
 export function evaluatePlacementSubmission(
-  username: string,
-  email: string,
-  userAnswers: Record<string, string>
+  studentOrUsername: StudentInfo | string,
+  emailOrAnswers?: string | Record<string, string>,
+  maybeAnswers?: Record<string, string>
 ): StudentResultReport {
+  let studentInfo: StudentInfo | undefined;
+  let username = "Student";
+  let email = "";
+  let userAnswers: Record<string, string> = {};
+
+  if (typeof studentOrUsername === "object") {
+    studentInfo = studentOrUsername;
+    username = studentInfo.name;
+    email = studentInfo.email;
+    userAnswers = (emailOrAnswers as Record<string, string>) || {};
+  } else {
+    username = studentOrUsername;
+    email = (emailOrAnswers as string) || "";
+    userAnswers = maybeAnswers || {};
+  }
+
   let correctCount = 0;
   const questions = ACTIVE_PLACEMENT_SET.questions;
 
@@ -178,6 +220,11 @@ export function evaluatePlacementSubmission(
     attemptId: `placement-${Date.now()}`,
     username,
     email,
+    studentInfo,
+    department: studentInfo?.department,
+    year: studentInfo?.year,
+    section: studentInfo?.section,
+    rollNumber: studentInfo?.rollNumber,
     testType: "Placement Questions",
     testTitle: ACTIVE_PLACEMENT_SET.title,
     score,
@@ -191,10 +238,26 @@ export function evaluatePlacementSubmission(
 }
 
 export function evaluateQuizSubmission(
-  username: string,
-  email: string,
-  userAnswers: Record<string, string>
+  studentOrUsername: StudentInfo | string,
+  emailOrAnswers?: string | Record<string, string>,
+  maybeAnswers?: Record<string, string>
 ): StudentResultReport {
+  let studentInfo: StudentInfo | undefined;
+  let username = "Student";
+  let email = "";
+  let userAnswers: Record<string, string> = {};
+
+  if (typeof studentOrUsername === "object") {
+    studentInfo = studentOrUsername;
+    username = studentInfo.name;
+    email = studentInfo.email;
+    userAnswers = (emailOrAnswers as Record<string, string>) || {};
+  } else {
+    username = studentOrUsername;
+    email = (emailOrAnswers as string) || "";
+    userAnswers = maybeAnswers || {};
+  }
+
   let correctCount = 0;
   const questions = ACTIVE_QUIZ_SET.questions;
 
@@ -221,6 +284,11 @@ export function evaluateQuizSubmission(
     attemptId: `quiz-${Date.now()}`,
     username,
     email,
+    studentInfo,
+    department: studentInfo?.department,
+    year: studentInfo?.year,
+    section: studentInfo?.section,
+    rollNumber: studentInfo?.rollNumber,
     testType: "General Quiz",
     testTitle: ACTIVE_QUIZ_SET.title,
     score,

@@ -5,6 +5,7 @@ import { UploadCloud, FileText, CheckCircle2, AlertCircle, Send, Clock, Calendar
 import { useOBAuth } from "./OBAuthProvider";
 import { UnauthorizedGuard } from "./UnauthorizedGuard";
 import { Button } from "../ui/Button";
+import { LeaderboardPublishCard } from "./LeaderboardPublishCard";
 
 interface QuizConfigurationProps {
   activityType: "General Quiz" | "Placement Questions";
@@ -608,6 +609,13 @@ export const QuizConfiguration: React.FC<QuizConfigurationProps> = ({
               Upon clicking <strong className="text-white">Submit for Approval</strong>, this proposal will be routed to the Admin Approval Queue. Content remains unposted until Admin approval.
             </div>
           </div>
+
+          {/* Leaderboard Publication Control for this Activity */}
+          <LeaderboardPublishCard
+            role="OFFICE_BEARER"
+            assignedResponsibility={activityType}
+            activityType={activityType}
+          />
 
           {/* Submissions Status List */}
           <div className="p-6 rounded-2xl bg-[#0D1B2A] border border-white/10 shadow-xl space-y-4">

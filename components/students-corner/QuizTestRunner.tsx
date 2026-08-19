@@ -4,6 +4,7 @@ import React, { useState, useEffect } from "react";
 import {
   ACTIVE_QUIZ_SET,
   StudentResultReport,
+  StudentInfo,
   getPublicQuizQuestions,
   evaluateQuizSubmission,
 } from "@/lib/studentState";
@@ -11,16 +12,27 @@ import { Clock, CheckCircle2, XCircle, ArrowRight, ArrowLeft } from "lucide-reac
 import { Button } from "../ui/Button";
 
 interface QuizTestRunnerProps {
-  username: string;
-  email: string;
+  studentInfo?: StudentInfo;
+  username?: string;
+  email?: string;
   onFinishTest: (report: StudentResultReport) => void;
 }
 
 export const QuizTestRunner: React.FC<QuizTestRunnerProps> = ({
+  studentInfo,
   username,
   email,
   onFinishTest,
 }) => {
+  const effectiveStudentInfo: StudentInfo = studentInfo || {
+    name: username || "Student",
+    email: email || "",
+    department: "Artificial Intelligence & Data Science",
+    year: "1",
+    section: "A",
+    rollNumber: "N/A",
+  };
+
   const [currentIdx, setCurrentIdx] = useState(0);
   const [userAnswers, setUserAnswers] = useState<Record<string, string>>({});
   const [timeLeftSeconds, setTimeLeftSeconds] = useState(
@@ -59,25 +71,24 @@ export const QuizTestRunner: React.FC<QuizTestRunnerProps> = ({
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
           testType: "General Quiz",
-          username,
-          email,
+          studentInfo: effectiveStudentInfo,
           userAnswers,
         }),
       });
 
       if (!res.ok) {
         const errData = await res.json().catch(() => ({}));
-        alert(errData.message || "Quiz submission rejected: This event is currently closed.");
+        alert(errData.message || "Quiz submission rejected: This event is currently closed or already attempted.");
         return;
       }
 
       const data = await res.json();
-      const generatedReport = data.report || evaluateQuizSubmission(username, email, userAnswers);
+      const generatedReport = data.report || evaluateQuizSubmission(effectiveStudentInfo, userAnswers);
       setReport(generatedReport);
       onFinishTest(generatedReport);
     } catch (err) {
       console.error("Quiz submission network error:", err);
-      const generatedReport = evaluateQuizSubmission(username, email, userAnswers);
+      const generatedReport = evaluateQuizSubmission(effectiveStudentInfo, userAnswers);
       setReport(generatedReport);
       onFinishTest(generatedReport);
     }
@@ -99,7 +110,10 @@ export const QuizTestRunner: React.FC<QuizTestRunnerProps> = ({
           <div>
             <h3 className="text-2xl font-bold text-[#F8FAFC]">Quiz Completed!</h3>
             <p className="text-xs text-[#CBD5E1] mt-1">
-              General Quiz results for <span className="font-semibold text-white">{report.username}</span>
+              General Quiz results for <span className="font-semibold text-white">{report.username}</span> ({report.email})
+            </p>
+            <p className="text-xs text-[#94A3B8] mt-0.5">
+              {report.department || effectiveStudentInfo.department} • Year {report.year || effectiveStudentInfo.year}-{report.section || effectiveStudentInfo.section} • Roll: {report.rollNumber || effectiveStudentInfo.rollNumber}
             </p>
           </div>
 

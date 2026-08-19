@@ -17,7 +17,7 @@ import {
   X,
   Clock,
 } from "lucide-react";
-import { StudentOTPModal } from "@/components/students-corner/StudentOTPModal";
+import { StudentInfoModal } from "@/components/students-corner/StudentInfoModal";
 import { PlacementTestRunner } from "@/components/students-corner/PlacementTestRunner";
 import { QuizTestRunner } from "@/components/students-corner/QuizTestRunner";
 import { WeeklyLeaderboard } from "@/components/students-corner/WeeklyLeaderboard";
@@ -26,7 +26,7 @@ import { MembershipForm } from "@/components/students-corner/MembershipForm";
 import { FeedList } from "@/components/office-bearer/FeedCard";
 import { OBAuthProvider, useOBAuth } from "@/components/office-bearer/OBAuthProvider";
 import { Button } from "@/components/ui/Button";
-import { StudentResultReport, ACTIVE_PLACEMENT_SET, ACTIVE_QUIZ_SET } from "@/lib/studentState";
+import { StudentResultReport, StudentInfo, ACTIVE_PLACEMENT_SET, ACTIVE_QUIZ_SET } from "@/lib/studentState";
 import { ActivityAvailabilityMap, INITIAL_ACTIVITY_AVAILABILITY } from "@/lib/adminState";
 import { FileText } from "lucide-react";
 
@@ -45,13 +45,18 @@ function StudentsCornerInner() {
 
   const [activeTab, setActiveTab] = useState<TabType>("overview");
 
-  // OTP Identity Modal State
-  const [otpModalOpen, setOtpModalOpen] = useState(false);
+  // Student Info Modal State
+  const [studentInfoModalOpen, setStudentInfoModalOpen] = useState(false);
   const [targetTestType, setTargetTestType] = useState<"Placement Questions" | "General Quiz">("Placement Questions");
-  const [verifiedStudent, setVerifiedStudent] = useState<{ username: string; email: string } | null>(null);
+  const [studentInfo, setStudentInfo] = useState<StudentInfo | null>(null);
 
-  // Admin Leaderboard publication state simulation (default false until Admin approves!)
+  // MongoDB-backed Leaderboard publication state & rankings
   const [leaderboardPublished, setLeaderboardPublished] = useState<boolean>(false);
+  const [leaderboardEntries, setLeaderboardEntries] = useState<any[]>([]);
+  const [leaderboardPublishedBy, setLeaderboardPublishedBy] = useState<string | null>(null);
+  const [leaderboardPublishedByRole, setLeaderboardPublishedByRole] = useState<string | null>(null);
+  const [leaderboardPublishedAt, setLeaderboardPublishedAt] = useState<string | null>(null);
+  const [leaderboardWeekNumber, setLeaderboardWeekNumber] = useState<number>(1);
 
   // Activity Availability State & Enforcement
   const [activityAvailability, setActivityAvailability] = useState<ActivityAvailabilityMap>(INITIAL_ACTIVITY_AVAILABILITY);
@@ -76,6 +81,23 @@ function StudentsCornerInner() {
     }
   };
 
+  const fetchLeaderboardData = async () => {
+    try {
+      const res = await fetch("/api/leaderboard");
+      if (res.ok) {
+        const data = await res.json();
+        setLeaderboardPublished(Boolean(data.isPublished));
+        setLeaderboardEntries(data.entries || []);
+        setLeaderboardPublishedBy(data.publishedBy || null);
+        setLeaderboardPublishedByRole(data.publishedByRole || null);
+        setLeaderboardPublishedAt(data.publishedAt || null);
+        setLeaderboardWeekNumber(data.weekNumber || 1);
+      }
+    } catch (e) {
+      console.error("Failed to fetch leaderboard data", e);
+    }
+  };
+
   const formatTimelineDisplay = (dateStr?: string | null) => {
     if (!dateStr) return "";
     try {
@@ -88,6 +110,7 @@ function StudentsCornerInner() {
 
   React.useEffect(() => {
     fetchAvailability();
+    fetchLeaderboardData();
   }, [activeTab]);
 
   const handleStartTestFlow = async (testType: "Placement Questions" | "General Quiz") => {
@@ -127,9 +150,9 @@ function StudentsCornerInner() {
     setTestInfoPreviewOpen(true);
   };
 
-  const handleOtpVerified = (username: string, email: string) => {
-    setVerifiedStudent({ username, email });
-    setOtpModalOpen(false);
+  const handleStudentInfoProceed = (info: StudentInfo) => {
+    setStudentInfo(info);
+    setStudentInfoModalOpen(false);
     if (targetTestType === "Placement Questions") {
       setActiveTab("placement-questions");
     } else {
@@ -173,11 +196,11 @@ function StudentsCornerInner() {
           </div>
         </Link>
 
-        {verifiedStudent && (
+        {studentInfo && (
           <div className="flex items-center space-x-2 px-3 py-1.5 rounded-xl bg-[#0D1B2A] border border-white/10 text-xs">
             <ShieldCheck className="w-4 h-4 text-emerald-400" />
-            <span className="font-semibold text-white">{verifiedStudent.username}</span>
-            <span className="text-[#94A3B8] text-[11px] font-mono">Verified Candidate</span>
+            <span className="font-semibold text-white">{studentInfo.name}</span>
+            <span className="text-[#94A3B8] text-[11px] font-mono">({studentInfo.department})</span>
           </div>
         )}
       </header>
@@ -278,7 +301,7 @@ function StudentsCornerInner() {
                         )}
                       </div>
                       <p className="text-xs text-[#CBD5E1] leading-relaxed">
-                        Practice interview coding sets (4 Questions • 30 Minutes) with email OTP verification and secure test environment.
+                        Practice interview coding sets (4 Questions • 30 Minutes) with instant score calculation and question breakdown.
                       </p>
                     </div>
                     <Button
@@ -482,7 +505,7 @@ function StudentsCornerInner() {
                   Return to Overview
                 </Button>
               </div>
-            ) : !verifiedStudent ? (
+            ) : !studentInfo ? (
               <div className="p-12 text-center rounded-2xl bg-[#0D1B2A] border border-white/10 max-w-xl mx-auto space-y-5">
                 <BriefcaseBusiness className="w-12 h-12 text-[#0078D4] mx-auto" />
                 <div>
@@ -502,13 +525,12 @@ function StudentsCornerInner() {
                   size="lg"
                   rightIcon={<ArrowRight className="w-4 h-4" />}
                 >
-                  Verify Email & Start Test
+                  Enter Details & Start Test
                 </Button>
               </div>
             ) : (
               <PlacementTestRunner
-                username={verifiedStudent.username}
-                email={verifiedStudent.email}
+                studentInfo={studentInfo}
                 onFinishTest={handleTestFinished}
               />
             )}
@@ -560,7 +582,7 @@ function StudentsCornerInner() {
                   Return to Overview
                 </Button>
               </div>
-            ) : !verifiedStudent ? (
+            ) : !studentInfo ? (
               <div className="p-12 text-center rounded-2xl bg-[#0D1B2A] border border-white/10 max-w-xl mx-auto space-y-5">
                 <CircleHelp className="w-12 h-12 text-blue-400 mx-auto" />
                 <div>
@@ -580,13 +602,12 @@ function StudentsCornerInner() {
                   size="lg"
                   rightIcon={<ArrowRight className="w-4 h-4" />}
                 >
-                  Verify Email & Start Quiz
+                  Enter Details & Start Quiz
                 </Button>
               </div>
             ) : (
               <QuizTestRunner
-                username={verifiedStudent.username}
-                email={verifiedStudent.email}
+                studentInfo={studentInfo}
                 onFinishTest={handleTestFinished}
               />
             )}
@@ -666,37 +687,43 @@ function StudentsCornerInner() {
 
         {/* TAB 7: WEEKLY LEADERBOARD */}
         {activeTab === "leaderboard" && (
-          <WeeklyLeaderboard isPublished={leaderboardPublished} />
+          <WeeklyLeaderboard
+            isPublished={leaderboardPublished}
+            entries={leaderboardEntries}
+            publishedBy={leaderboardPublishedBy}
+            publishedByRole={leaderboardPublishedByRole}
+            publishedAt={leaderboardPublishedAt}
+            weekNumber={leaderboardWeekNumber}
+          />
         )}
 
         {/* TAB 8: MEMBERSHIP FORM */}
         {activeTab === "membership" && <MembershipForm />}
       </main>
 
-      {/* Test Information & Rules Preview Modal */}
+      {/* Test Security Guidelines / Info Preview Modal */}
       {testInfoPreviewOpen && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/80 backdrop-blur-md animate-fade-in">
-          <div className="w-full max-w-lg rounded-2xl bg-[#0D1B2A] border border-white/15 p-6 sm:p-8 shadow-2xl relative space-y-6 max-h-[90vh] overflow-y-auto">
-            <div className="flex items-center justify-between pb-4 border-b border-white/10">
-              <div>
-                <span className="text-xs font-mono uppercase tracking-wider text-[#22D3EE] block">
-                  {targetTestType} Information
-                </span>
-                <h3 className="text-xl font-bold text-[#F8FAFC]">
-                  {targetTestType === "Placement Questions"
-                    ? ACTIVE_PLACEMENT_SET.title
-                    : ACTIVE_QUIZ_SET.title}
-                </h3>
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/75 backdrop-blur-sm animate-fade-in">
+          <div className="w-full max-w-lg rounded-2xl bg-[#0D1B2A] border border-white/15 p-6 sm:p-8 shadow-2xl space-y-6 relative">
+            <button
+              onClick={() => setTestInfoPreviewOpen(false)}
+              className="absolute top-5 right-5 text-[#94A3B8] hover:text-[#F8FAFC] p-1 rounded-lg hover:bg-white/5 transition-colors"
+            >
+              <X className="w-5 h-5" />
+            </button>
+
+            <div className="space-y-2 text-center">
+              <div className="w-12 h-12 rounded-xl bg-[#0078D4]/20 border border-[#0078D4]/30 text-[#22D3EE] flex items-center justify-center mx-auto">
+                <ShieldCheck className="w-6 h-6" />
               </div>
-              <button
-                onClick={() => setTestInfoPreviewOpen(false)}
-                className="p-1 rounded-lg text-[#94A3B8] hover:text-white hover:bg-white/10"
-              >
-                <X className="w-5 h-5" />
-              </button>
+              <h3 className="text-xl font-bold text-[#F8FAFC]">
+                {targetTestType === "Placement Questions" ? "Placement Assessment Protocol" : "General Quiz Instructions"}
+              </h3>
+              <p className="text-xs text-[#CBD5E1]">
+                Please review the assessment instructions before proceeding to enter your details.
+              </p>
             </div>
 
-            {/* Config Overview Grid */}
             <div className="grid grid-cols-2 sm:grid-cols-3 gap-3 p-3.5 rounded-xl bg-[#07111F] border border-white/10 text-xs">
               <div>
                 <span className="text-[#94A3B8] block text-[10px] font-mono uppercase">Questions</span>
@@ -713,52 +740,34 @@ function StudentsCornerInner() {
                 </span>
               </div>
               <div>
-                <span className="text-[#94A3B8] block text-[10px] font-mono uppercase">Random Questions</span>
-                <span className="font-semibold text-emerald-400">Yes</span>
-              </div>
-              <div>
-                <span className="text-[#94A3B8] block text-[10px] font-mono uppercase">Random Choices</span>
-                <span className="font-semibold text-emerald-400">Yes</span>
-              </div>
-              <div>
                 <span className="text-[#94A3B8] block text-[10px] font-mono uppercase">Attempts Allowed</span>
                 <span className="font-semibold text-amber-400">1 Attempt</span>
               </div>
-              <div>
-                <span className="text-[#94A3B8] block text-[10px] font-mono uppercase">Scoring</span>
-                <span className="font-semibold text-[#CBD5E1]">Server Evaluated</span>
-              </div>
             </div>
 
-            {/* Rules / Instructions Section */}
-            <div className="space-y-3">
-              <h4 className="text-xs font-bold uppercase tracking-wider text-[#F8FAFC]">
-                BEFORE YOU BEGIN
-              </h4>
-              <div className="p-4 rounded-xl bg-[#07111F] border border-white/10 text-xs text-[#CBD5E1] space-y-2 leading-relaxed">
-                <p className="flex items-start gap-2">
-                  <span className="text-[#0078D4] font-bold">•</span>
-                  <span>Make sure you have a stable internet connection.</span>
-                </p>
-                <p className="flex items-start gap-2">
-                  <span className="text-[#0078D4] font-bold">•</span>
-                  <span>The timer starts when you begin the assessment.</span>
-                </p>
-                <p className="flex items-start gap-2">
-                  <span className="text-[#0078D4] font-bold">•</span>
-                  <span>You cannot restart the test once it has started.</span>
-                </p>
-                <p className="flex items-start gap-2">
-                  <span className="text-[#0078D4] font-bold">•</span>
-                  <span>Your answers are automatically submitted when the test is completed or time expires.</span>
-                </p>
-                <p className="flex items-start gap-2">
-                  <span className="text-amber-400 font-bold">•</span>
-                  <span>Leaving the secure test environment (fullscreen exit, tab switch) may be recorded as a security violation.</span>
-                </p>
-                <p className="flex items-start gap-2">
+            <div className="p-4 rounded-xl bg-[#07111F] border border-white/10 space-y-2.5 text-xs text-[#CBD5E1]">
+              <div className="space-y-2">
+                <p className="flex items-start space-x-2">
                   <span className="text-emerald-400 font-bold">•</span>
-                  <span>Your final score and detailed report are calculated securely by the server.</span>
+                  <span>Single-attempt assessment: You may only submit this test once.</span>
+                </p>
+                <p className="flex items-start space-x-2">
+                  <span className="text-emerald-400 font-bold">•</span>
+                  <span>Ensure a stable internet connection throughout the test duration.</span>
+                </p>
+                <p className="flex items-start space-x-2">
+                  <span className="text-[#0078D4] font-bold">•</span>
+                  <span>The timer starts as soon as you begin the assessment.</span>
+                </p>
+                {targetTestType === "Placement Questions" && (
+                  <p className="flex items-start space-x-2">
+                    <span className="text-amber-400 font-bold">•</span>
+                    <span>Full-screen mode is enforced. Tab switching or exiting full-screen records security violations.</span>
+                  </p>
+                )}
+                <p className="flex items-start space-x-2">
+                  <span className="text-emerald-400 font-bold">•</span>
+                  <span>Your final score and detailed report are calculated securely by the server and displayed immediately.</span>
                 </p>
               </div>
             </div>
@@ -776,23 +785,24 @@ function StudentsCornerInner() {
                 size="md"
                 onClick={() => {
                   setTestInfoPreviewOpen(false);
-                  setOtpModalOpen(true);
+                  setStudentInfoModalOpen(true);
                 }}
                 rightIcon={<ArrowRight className="w-4 h-4" />}
               >
-                I Understand & Proceed to Verification
+                I Understand & Enter Details
               </Button>
             </div>
           </div>
         </div>
       )}
 
-      {/* Student OTP Identity Modal */}
-      <StudentOTPModal
-        isOpen={otpModalOpen}
+      {/* Student Information Modal (No OTP) */}
+      <StudentInfoModal
+        isOpen={studentInfoModalOpen}
+        testType={targetTestType}
         testTitle={targetTestType === "Placement Questions" ? ACTIVE_PLACEMENT_SET.title : ACTIVE_QUIZ_SET.title}
-        onClose={() => setOtpModalOpen(false)}
-        onVerifiedSuccess={handleOtpVerified}
+        onClose={() => setStudentInfoModalOpen(false)}
+        onProceed={handleStudentInfoProceed}
       />
 
       {/* Activity Availability Blocked Notice Modal */}

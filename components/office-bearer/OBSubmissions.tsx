@@ -1,7 +1,7 @@
 "use client";
 
 import React, { useState } from "react";
-import { History, Eye, X, CheckCircle2, Clock, XCircle, FileText, Edit3, RefreshCw, AlertCircle, Calendar } from "lucide-react";
+import { History, Eye, X, CheckCircle2, Clock, XCircle, FileText, Edit3, RefreshCw, AlertCircle, Calendar, Image as ImageIcon, Video, UploadCloud, Trash2 } from "lucide-react";
 import { useOBAuth } from "./OBAuthProvider";
 import { Button } from "../ui/Button";
 import { LoadingState } from "../ui/LoadingState";
@@ -35,6 +35,10 @@ export const OBSubmissions: React.FC = () => {
   const [editTitle, setEditTitle] = useState("");
   const [editDetails, setEditDetails] = useState("");
   const [editComment, setEditComment] = useState("");
+  const [editMediaType, setEditMediaType] = useState<"none" | "image" | "video">("none");
+  const [editMediaUrl, setEditMediaUrl] = useState<string>("");
+  const [editMediaPublicId, setEditMediaPublicId] = useState<string>("");
+  const [isUploadingEditMedia, setIsUploadingEditMedia] = useState(false);
   const [isSubmittingRevision, setIsSubmittingRevision] = useState(false);
   const [revisionSuccess, setRevisionSuccess] = useState(false);
 
@@ -151,7 +155,47 @@ export const OBSubmissions: React.FC = () => {
     setEditTitle(sub.originalData?.title || sub.title || "");
     setEditDetails(sub.originalData?.content || sub.details || "");
     setEditComment("");
+    setEditMediaType((sub.originalData?.mediaType as any) || "none");
+    setEditMediaUrl(sub.originalData?.mediaUrl || "");
+    setEditMediaPublicId(sub.originalData?.mediaPublicId || "");
     setRevisionSuccess(false);
+  };
+
+  // Handle uploading new media during feed revision
+  const handleEditMediaFileChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+
+    setIsUploadingEditMedia(true);
+    try {
+      const formData = new FormData();
+      formData.append("media", file);
+
+      const res = await fetch("/api/office-bearer/feed/upload", {
+        method: "POST",
+        body: formData,
+      });
+
+      if (!res.ok) {
+        const errorData = await res.json().catch(() => ({}));
+        throw new Error(errorData.message || "Unable to upload media to Cloudinary.");
+      }
+
+      const data = await res.json();
+      setEditMediaType(data.type === "VIDEO" ? "video" : "image");
+      setEditMediaUrl(data.url);
+      setEditMediaPublicId(data.publicId || "");
+    } catch (err: any) {
+      alert(err.message || "Failed to upload media. Please try again.");
+    } finally {
+      setIsUploadingEditMedia(false);
+    }
+  };
+
+  const handleRemoveEditMedia = () => {
+    setEditMediaType("none");
+    setEditMediaUrl("");
+    setEditMediaPublicId("");
   };
 
   // Handle opening the deadline extension modal
@@ -180,6 +224,9 @@ export const OBSubmissions: React.FC = () => {
       if (editingSubmission.type === "Feed Community") {
         changes.details = editDetails;
         changes.title = editDetails.length > 50 ? `${editDetails.substring(0, 47)}...` : editDetails;
+        changes.mediaType = editMediaType;
+        changes.mediaUrl = editMediaUrl || null;
+        changes.mediaPublicId = editMediaPublicId || "";
       } else {
         changes.title = editTitle;
         changes.details = editDetails;
@@ -693,6 +740,58 @@ export const OBSubmissions: React.FC = () => {
                     />
                   </div>
 
+                  {editingSubmission.type === "Feed Community" && (
+                    <div className="p-3.5 rounded-xl bg-[#07111F] border border-white/10 space-y-3">
+                      <div className="flex items-center justify-between">
+                        <span className="text-xs font-semibold text-[#CBD5E1] flex items-center space-x-2">
+                          <UploadCloud className="w-4 h-4 text-[#22D3EE]" />
+                          <span>Attached Image / Video</span>
+                        </span>
+                        <span className="text-[10px] font-mono text-[#94A3B8]">
+                          CLOUDINARY STORAGE
+                        </span>
+                      </div>
+
+                      {editMediaType !== "none" && editMediaUrl ? (
+                        <div className="relative rounded-xl overflow-hidden border border-white/10 max-h-56 bg-black">
+                          <button
+                            type="button"
+                            onClick={handleRemoveEditMedia}
+                            className="absolute top-2 right-2 p-1.5 rounded-full bg-black/75 text-white hover:bg-red-500 transition-colors z-10"
+                            title="Remove Media"
+                          >
+                            <X className="w-4 h-4" />
+                          </button>
+                          {editMediaType === "video" ? (
+                            <video src={editMediaUrl} controls className="w-full h-48 object-cover" />
+                          ) : (
+                            <img src={editMediaUrl} alt="Revision media preview" className="w-full h-48 object-cover" />
+                          )}
+                        </div>
+                      ) : (
+                        <label className="cursor-pointer flex items-center justify-center space-x-2 p-3 rounded-xl border border-dashed border-white/20 hover:border-[#0078D4] bg-white/[0.02] text-xs text-[#CBD5E1] transition-colors">
+                          <input
+                            type="file"
+                            accept="image/*,video/*"
+                            onChange={handleEditMediaFileChange}
+                            disabled={isUploadingEditMedia}
+                            className="hidden"
+                          />
+                          {isUploadingEditMedia ? (
+                            <span className="animate-pulse text-[#22D3EE]">
+                              Uploading to Cloudinary...
+                            </span>
+                          ) : (
+                            <>
+                              <ImageIcon className="w-4 h-4 text-[#0078D4]" />
+                              <span>Upload New Image or Video (Cloudinary)</span>
+                            </>
+                          )}
+                        </label>
+                      )}
+                    </div>
+                  )}
+
                   <div>
                     <label className="block text-xs font-medium text-[#CBD5E1] mb-1.5">
                       Revision Comment <span className="text-[#94A3B8]">(optional)</span>
@@ -701,7 +800,7 @@ export const OBSubmissions: React.FC = () => {
                       type="text"
                       value={editComment}
                       onChange={(e) => setEditComment(e.target.value)}
-                      placeholder="e.g. Fixed typo in question 5"
+                      placeholder="e.g. Updated image with new event banner"
                       className="w-full h-11 px-3.5 rounded-xl bg-[#07111F] border border-white/15 text-[#F8FAFC] placeholder-[#94A3B8] text-sm focus:outline-none focus:border-[#0078D4]"
                     />
                   </div>

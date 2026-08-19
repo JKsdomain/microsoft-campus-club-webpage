@@ -290,35 +290,71 @@ FeedReactionSchema.index({ feedPostId: 1, actorId: 1 }, { unique: true });
 // 13. TEST_ATTEMPTS
 const TestAttemptSchema = new Schema(
   {
-    testType: {
+    // Student Details
+    studentName: { type: String, required: true },
+    studentEmail: { type: String, required: true },
+    studentEmailNormalized: { type: String, required: true, index: true },
+    department: { type: String, required: true },
+    year: { type: String, required: true },
+    section: { type: String, required: true },
+    rollNumber: { type: String, required: true },
+
+    // Activity Details (activityId is the logical root proposal ID)
+    activityId: { type: Schema.Types.ObjectId, required: true, index: true },
+    activityType: {
       type: String,
       enum: ["GENERAL_QUIZ", "PLACEMENT_QUESTIONS"],
       required: true,
-    },
-    testId: { type: Schema.Types.ObjectId, required: true, index: true },
-    participant: {
-      username: { type: String, required: true },
-      email: { type: String, required: true, index: true },
-    },
-    emailVerified: { type: Boolean, default: true },
-    startedAt: { type: Date, default: Date.now },
-    expiresAt: { type: Date, required: true },
-    submittedAt: { type: Date, default: null },
-    status: {
-      type: String,
-      enum: ["STARTED", "IN_PROGRESS", "SUBMITTED", "EXPIRED", "TERMINATED"],
-      default: "STARTED",
       index: true,
     },
-    score: { type: Number, default: null },
+    activityVersion: { type: Number, default: 0 },
+
+    // Scores
+    score: { type: Number, required: true },
     totalQuestions: { type: Number, required: true },
-    correctAnswers: { type: Number, default: null },
-    incorrectAnswers: { type: Number, default: null },
-    percentage: { type: Number, default: null },
+    correctAnswers: { type: Number, required: true },
+    wrongAnswers: { type: Number, required: true },
+    percentage: { type: Number, required: true },
+
+    // Immutable Question-Result Snapshot
+    questionSnapshot: [
+      {
+        questionId: { type: String, required: true },
+        question: { type: String, required: true },
+        selectedAnswer: { type: String, required: true },
+        correctAnswer: { type: String, required: true },
+        isCorrect: { type: Boolean, required: true },
+        explanation: { type: String, required: true },
+      },
+    ],
+
+    submittedAnswers: { type: Schema.Types.Mixed, default: {} },
+    startedAt: { type: Date, default: Date.now },
+    submittedAt: { type: Date, default: Date.now },
+    status: {
+      type: String,
+      enum: ["STARTED", "IN_PROGRESS", "SUBMITTED", "COMPLETED", "EXPIRED", "TERMINATED"],
+      default: "COMPLETED",
+      index: true,
+    },
     violationCount: { type: Number, default: 0 },
+
+    // Backward-compatibility legacy fields
+    testType: { type: String, default: null },
+    testId: { type: Schema.Types.ObjectId, default: null },
+    participant: {
+      username: { type: String, default: null },
+      email: { type: String, default: null },
+    },
+    emailVerified: { type: Boolean, default: true },
+    expiresAt: { type: Date, default: null },
+    incorrectAnswers: { type: Number, default: null },
   },
   { timestamps: true }
 );
+
+// Enforce unique attempt per normalized student email + logical activity ID
+TestAttemptSchema.index({ studentEmailNormalized: 1, activityId: 1 }, { unique: true });
 
 // 14. TEST_ANSWERS
 const TestAnswerSchema = new Schema(
@@ -335,16 +371,20 @@ const TestAnswerSchema = new Schema(
 // 15. LEADERBOARD_WEEKS
 const LeaderboardWeekSchema = new Schema(
   {
-    weekNumber: { type: Number, required: true },
-    startDate: { type: Date, required: true, index: true },
-    endDate: { type: Date, required: true, index: true },
+    weekNumber: { type: Number, default: 1 },
+    activityType: { type: String, default: "ALL", index: true },
+    startDate: { type: Date, default: () => new Date(), index: true },
+    endDate: { type: Date, default: () => new Date(Date.now() + 7 * 24 * 60 * 60 * 1000), index: true },
     status: {
       type: String,
-      enum: ["GENERATED", "PENDING_APPROVAL", "PUBLISHED", "ARCHIVED"],
-      default: "PENDING_APPROVAL",
+      enum: ["GENERATED", "PENDING_APPROVAL", "PUBLISHED", "UNPUBLISHED", "ARCHIVED"],
+      default: "UNPUBLISHED",
       index: true,
     },
+    isPublished: { type: Boolean, default: false, index: true },
     publishedAt: { type: Date, default: null },
+    publishedBy: { type: String, default: null },
+    publishedByRole: { type: String, default: null },
     approvedBy: { type: Schema.Types.ObjectId, ref: "admins", default: null },
     approvedAt: { type: Date, default: null },
   },

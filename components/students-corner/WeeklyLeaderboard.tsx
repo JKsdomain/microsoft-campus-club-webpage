@@ -1,17 +1,39 @@
 "use client";
 
 import React from "react";
-import { INITIAL_LEADERBOARD, LeaderboardEntry } from "@/lib/studentState";
 import { Trophy, ShieldAlert, Award, CheckCircle2 } from "lucide-react";
+
+export interface LeaderboardItem {
+  rank: number;
+  username: string;
+  email?: string;
+  department?: string;
+  year?: string;
+  section?: string;
+  rollNumber?: string;
+  score: number;
+  percentage: number;
+  totalQuestions?: number;
+  testType?: string;
+  timestamp?: string;
+}
 
 interface WeeklyLeaderboardProps {
   isPublished: boolean;
-  entries?: LeaderboardEntry[];
+  entries?: LeaderboardItem[];
+  publishedBy?: string | null;
+  publishedByRole?: string | null;
+  publishedAt?: string | null;
+  weekNumber?: number;
 }
 
 export const WeeklyLeaderboard: React.FC<WeeklyLeaderboardProps> = ({
   isPublished,
-  entries = INITIAL_LEADERBOARD,
+  entries = [],
+  publishedBy,
+  publishedByRole,
+  publishedAt,
+  weekNumber = 1,
 }) => {
   if (!isPublished) {
     return (
@@ -24,15 +46,12 @@ export const WeeklyLeaderboard: React.FC<WeeklyLeaderboardProps> = ({
             WEEKLY LEADERBOARD
           </h3>
           <p className="text-sm font-semibold text-amber-400">
-            Results are being reviewed.
+            Leaderboard will be available once it is published.
           </p>
           <p className="text-xs text-[#CBD5E1] pt-1">
-            The leaderboard will be published after verification.
+            Results are currently under evaluation. Please check back soon after the official rankings are published by the Administrator or assigned Office Bearer.
           </p>
         </div>
-        <p className="text-xs text-[#94A3B8] max-w-md mx-auto">
-          Weekly test results are currently being audited by the MCC Admin evaluation committee. Once approved in the Admin Workflow, official public rankings will be published here.
-        </p>
       </div>
     );
   }
@@ -40,7 +59,7 @@ export const WeeklyLeaderboard: React.FC<WeeklyLeaderboardProps> = ({
   return (
     <div className="space-y-6 max-w-4xl mx-auto animate-fade-in">
       {/* Leaderboard Banner Header */}
-      <div className="p-6 sm:p-8 rounded-2xl bg-gradient-to-r from-[#0D1B2A] via-[#07111F] to-[#0078D4]/20 border border-white/10 shadow-2xl flex items-center justify-between">
+      <div className="p-6 sm:p-8 rounded-2xl bg-gradient-to-r from-[#0D1B2A] via-[#07111F] to-[#0078D4]/20 border border-white/10 shadow-2xl flex items-center justify-between flex-wrap gap-4">
         <div className="space-y-2">
           <div className="flex items-center space-x-2">
             <Trophy className="w-6 h-6 text-amber-400" />
@@ -49,13 +68,18 @@ export const WeeklyLeaderboard: React.FC<WeeklyLeaderboardProps> = ({
             </h3>
           </div>
           <p className="text-xs text-[#CBD5E1]">
-            Official MCC Student Performance Rankings • Week 33
+            Official MCC Student Performance Rankings • Week {weekNumber}
+            {publishedBy && (
+              <span className="text-[#94A3B8] block mt-0.5">
+                Published by <strong className="text-white">{publishedBy}</strong> ({publishedByRole === "ADMIN" ? "Administrator" : "Office Bearer"})
+              </span>
+            )}
           </p>
         </div>
 
         <span className="px-3 py-1 rounded-full text-xs font-semibold bg-emerald-500/10 text-emerald-400 border border-emerald-500/20 flex items-center space-x-1.5">
           <CheckCircle2 className="w-3.5 h-3.5" />
-          <span>Admin Approved & Live</span>
+          <span>Official & Live</span>
         </span>
       </div>
 
@@ -66,54 +90,73 @@ export const WeeklyLeaderboard: React.FC<WeeklyLeaderboardProps> = ({
             <thead className="bg-[#07111F] border-b border-white/10 text-[11px] font-mono text-[#94A3B8] uppercase">
               <tr>
                 <th className="py-4 px-6">Rank</th>
-                <th className="py-4 px-6">Student Username</th>
+                <th className="py-4 px-6">Student</th>
+                <th className="py-4 px-6">Department</th>
                 <th className="py-4 px-6">Score Points</th>
                 <th className="py-4 px-6 text-right">Percentage</th>
               </tr>
             </thead>
             <tbody className="divide-y divide-white/5 font-medium">
-              {entries.map((item) => (
-                <tr
-                  key={item.rank}
-                  className={`hover:bg-white/[0.03] transition-colors ${
-                    item.rank === 1 ? "bg-amber-500/5" : ""
-                  }`}
-                >
-                  <td className="py-4 px-6">
-                    <div className="flex items-center space-x-2">
-                      {item.rank === 1 && (
-                        <div className="w-7 h-7 rounded-lg bg-amber-500/20 border border-amber-500/30 flex items-center justify-center text-amber-400 font-bold text-xs">
-                          🥇 1
-                        </div>
-                      )}
-                      {item.rank === 2 && (
-                        <div className="w-7 h-7 rounded-lg bg-slate-300/20 border border-slate-300/30 flex items-center justify-center text-slate-200 font-bold text-xs">
-                          🥈 2
-                        </div>
-                      )}
-                      {item.rank === 3 && (
-                        <div className="w-7 h-7 rounded-lg bg-amber-700/20 border border-amber-700/30 flex items-center justify-center text-amber-500 font-bold text-xs">
-                          🥉 3
-                        </div>
-                      )}
-                      {item.rank > 3 && (
-                        <span className="w-7 h-7 flex items-center justify-center font-mono text-xs text-[#94A3B8]">
-                          #{item.rank}
-                        </span>
-                      )}
-                    </div>
-                  </td>
-                  <td className="py-4 px-6 text-[#F8FAFC] font-semibold">
-                    {item.username}
-                  </td>
-                  <td className="py-4 px-6 font-mono text-[#22D3EE]">
-                    {item.score} pts
-                  </td>
-                  <td className="py-4 px-6 text-right font-mono text-emerald-400">
-                    {item.percentage}%
+              {entries.length === 0 ? (
+                <tr>
+                  <td colSpan={5} className="py-8 text-center text-xs text-[#94A3B8] italic">
+                    No student attempts recorded for this round yet.
                   </td>
                 </tr>
-              ))}
+              ) : (
+                entries.map((item) => (
+                  <tr
+                    key={item.rank}
+                    className={`hover:bg-white/[0.03] transition-colors ${
+                      item.rank === 1 ? "bg-amber-500/5" : ""
+                    }`}
+                  >
+                    <td className="py-4 px-6">
+                      <div className="flex items-center space-x-2">
+                        {item.rank === 1 && (
+                          <div className="w-7 h-7 rounded-lg bg-amber-500/20 border border-amber-500/30 flex items-center justify-center text-amber-400 font-bold text-xs">
+                            🥇 1
+                          </div>
+                        )}
+                        {item.rank === 2 && (
+                          <div className="w-7 h-7 rounded-lg bg-slate-300/20 border border-slate-300/30 flex items-center justify-center text-slate-200 font-bold text-xs">
+                            🥈 2
+                          </div>
+                        )}
+                        {item.rank === 3 && (
+                          <div className="w-7 h-7 rounded-lg bg-amber-700/20 border border-amber-700/30 flex items-center justify-center text-amber-500 font-bold text-xs">
+                            🥉 3
+                          </div>
+                        )}
+                        {item.rank > 3 && (
+                          <span className="w-7 h-7 flex items-center justify-center font-mono text-xs text-[#94A3B8]">
+                            #{item.rank}
+                          </span>
+                        )}
+                      </div>
+                    </td>
+                    <td className="py-4 px-6">
+                      <div className="font-semibold text-[#F8FAFC]">
+                        {item.username}
+                      </div>
+                      {item.rollNumber && item.rollNumber !== "N/A" && (
+                        <span className="text-[11px] text-[#94A3B8] font-mono block">
+                          Roll: {item.rollNumber}
+                        </span>
+                      )}
+                    </td>
+                    <td className="py-4 px-6 text-xs text-[#CBD5E1]">
+                      {item.department || "General"}
+                    </td>
+                    <td className="py-4 px-6 font-mono text-[#22D3EE]">
+                      {item.score} pts
+                    </td>
+                    <td className="py-4 px-6 text-right font-mono text-emerald-400">
+                      {item.percentage}%
+                    </td>
+                  </tr>
+                ))
+              )}
             </tbody>
           </table>
         </div>
@@ -121,3 +164,4 @@ export const WeeklyLeaderboard: React.FC<WeeklyLeaderboardProps> = ({
     </div>
   );
 };
+

@@ -5,6 +5,7 @@ import Link from "next/link";
 import { Users, CheckCircle2, Clock, ArrowRight, ShieldCheck, AlertCircle, XCircle } from "lucide-react";
 import { useOBAuth } from "./OBAuthProvider";
 import { Button } from "../ui/Button";
+import { LeaderboardPublishCard } from "./LeaderboardPublishCard";
 
 export const OBDashboard: React.FC = () => {
   const { currentOb, submissions, feedPosts } = useOBAuth();
@@ -137,6 +138,15 @@ export const OBDashboard: React.FC = () => {
             );
           })}
         </div>
+      )}
+
+      {/* Leaderboard Publication Control for Responsible Office Bearer */}
+      {(respName === "General Quiz" || respName === "Placement Questions") && (
+        <LeaderboardPublishCard
+          role="OFFICE_BEARER"
+          assignedResponsibility={respName}
+          activityType={respName}
+        />
       )}
 
       {/* Submissions / Activity Status Card */}

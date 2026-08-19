@@ -1,16 +1,16 @@
 import { NextResponse } from "next/server";
 import { dbConnect } from "@/lib/db/dbConnect";
-import { SystemSetting, ProposalModel } from "@/lib/db/models";
+import { SystemSetting, ProposalModel, TestAttempt } from "@/lib/db/models";
 
 // POST /api/students-corner/validate-event
-// Body: { activityName: "Placement Questions" | "General Quiz" | "Technical Games" }
-// Validates whether the event is currently OPEN in MongoDB before allowing access/test start.
+// Body: { activityName: "Placement Questions" | "General Quiz" | "Technical Games", email?: string }
+// Validates whether the event is currently OPEN in MongoDB and checks if the student (by normalized email) has already attempted it.
 // Enforces server-side timeline verification (startAt, endAt) for General Quiz and Placement Questions.
 export async function POST(req: Request) {
   try {
     await dbConnect();
     const body = await req.json();
-    const { activityName } = body;
+    const { activityName, email } = body;
 
     if (!activityName) {
       return NextResponse.json({ message: "activityName is required." }, { status: 400 });
@@ -18,7 +18,7 @@ export async function POST(req: Request) {
 
     const now = new Date();
 
-    // 1. Check timeline on active approved proposal for General Quiz & Placement Questions
+    // 1. Check timeline and duplicate attempt on active approved proposal for General Quiz & Placement Questions
     if (activityName === "General Quiz" || activityName === "Placement Questions") {
       const dbType = activityName === "General Quiz" ? "GENERAL_QUIZ" : "PLACEMENT_QUESTIONS";
       const activeProposal = await ProposalModel.findOne({
@@ -27,41 +27,70 @@ export async function POST(req: Request) {
         isActive: true,
       }).sort({ submittedAt: -1 });
 
-      if (activeProposal && activeProposal.startAt && activeProposal.endAt) {
-        const startAt = new Date(activeProposal.startAt);
-        const endAt = new Date(activeProposal.endAt);
+      if (activeProposal) {
+        // Logical activity ID is the root proposal ID across all revisions
+        const logicalActivityId = activeProposal.parentId || activeProposal._id;
 
-        if (now < startAt) {
-          return NextResponse.json(
-            {
-              allowed: false,
-              status: "UPCOMING",
-              message: `"${activityName}" has not started yet. (Starts at: ${startAt.toLocaleString()})`,
-              startAt: startAt.toISOString(),
-              endAt: endAt.toISOString(),
-            },
-            { status: 403 }
-          );
+        // Timeline check
+        if (activeProposal.startAt && activeProposal.endAt) {
+          const startAt = new Date(activeProposal.startAt);
+          const endAt = new Date(activeProposal.endAt);
+
+          if (now < startAt) {
+            return NextResponse.json(
+              {
+                allowed: false,
+                status: "UPCOMING",
+                message: `"${activityName}" has not started yet. (Starts at: ${startAt.toLocaleString()})`,
+                startAt: startAt.toISOString(),
+                endAt: endAt.toISOString(),
+              },
+              { status: 403 }
+            );
+          }
+
+          if (now > endAt) {
+            return NextResponse.json(
+              {
+                allowed: false,
+                status: "CLOSED",
+                message: `"${activityName}" has ended. (Closed at: ${endAt.toLocaleString()})`,
+                startAt: startAt.toISOString(),
+                endAt: endAt.toISOString(),
+              },
+              { status: 403 }
+            );
+          }
         }
 
-        if (now > endAt) {
-          return NextResponse.json(
-            {
-              allowed: false,
-              status: "CLOSED",
-              message: `"${activityName}" has ended. (Closed at: ${endAt.toLocaleString()})`,
-              startAt: startAt.toISOString(),
-              endAt: endAt.toISOString(),
-            },
-            { status: 403 }
-          );
+        // Duplicate attempt check if email is provided
+        if (email && typeof email === "string" && email.trim()) {
+          const studentEmailNormalized = email.trim().toLowerCase();
+          const existingAttempt = await TestAttempt.findOne({
+            studentEmailNormalized,
+            activityId: logicalActivityId,
+            status: { $in: ["COMPLETED", "SUBMITTED"] },
+          });
+
+          if (existingAttempt) {
+            return NextResponse.json(
+              {
+                allowed: false,
+                code: "ALREADY_ATTEMPTED",
+                message: "You have already attempted this test.",
+                activityId: logicalActivityId,
+              },
+              { status: 409 }
+            );
+          }
         }
 
         return NextResponse.json({
           allowed: true,
           status: "OPEN",
-          startAt: startAt.toISOString(),
-          endAt: endAt.toISOString(),
+          activityId: logicalActivityId,
+          startAt: activeProposal.startAt ? new Date(activeProposal.startAt).toISOString() : null,
+          endAt: activeProposal.endAt ? new Date(activeProposal.endAt).toISOString() : null,
         });
       }
     }

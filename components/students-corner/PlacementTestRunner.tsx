@@ -4,6 +4,7 @@ import React, { useState, useEffect, useRef } from "react";
 import {
   ACTIVE_PLACEMENT_SET,
   StudentResultReport,
+  StudentInfo,
   getPublicPlacementQuestions,
   evaluatePlacementSubmission,
 } from "@/lib/studentState";
@@ -23,18 +24,31 @@ import {
 import { Button } from "../ui/Button";
 
 interface PlacementTestRunnerProps {
-  username: string;
-  email: string;
+  studentInfo?: StudentInfo;
+  username?: string;
+  email?: string;
   onFinishTest: (report: StudentResultReport) => void;
 }
 
 const MAX_VIOLATIONS = 3;
 
 export const PlacementTestRunner: React.FC<PlacementTestRunnerProps> = ({
+  studentInfo,
   username,
   email,
   onFinishTest,
 }) => {
+  const effectiveStudentInfo: StudentInfo = studentInfo || {
+    name: username || "Student",
+    email: email || "",
+    department: "Artificial Intelligence & Data Science",
+    year: "1",
+    section: "A",
+    rollNumber: "N/A",
+  };
+
+  const candidateName = effectiveStudentInfo.name;
+  const candidateEmail = effectiveStudentInfo.email;
   const [currentIdx, setCurrentIdx] = useState(0);
   const [userAnswers, setUserAnswers] = useState<Record<string, string>>({});
   const [timeLeftSeconds, setTimeLeftSeconds] = useState(
@@ -189,26 +203,25 @@ export const PlacementTestRunner: React.FC<PlacementTestRunnerProps> = ({
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
           testType: "Placement Questions",
-          username,
-          email,
+          studentInfo: effectiveStudentInfo,
           userAnswers,
         }),
       });
 
       if (!res.ok) {
         const errData = await res.json().catch(() => ({}));
-        alert(errData.message || "Assessment submission rejected: This event is currently closed.");
+        alert(errData.message || "Assessment submission rejected: This event is currently closed or already attempted.");
         return;
       }
 
       const data = await res.json();
-      const generatedReport = data.report || evaluatePlacementSubmission(username, email, userAnswers);
+      const generatedReport = data.report || evaluatePlacementSubmission(effectiveStudentInfo, userAnswers);
       setReport(generatedReport);
       onFinishTest(generatedReport);
     } catch (err) {
       console.error("Test submission network error:", err);
       // Fallback local evaluation only if network issue
-      const generatedReport = evaluatePlacementSubmission(username, email, userAnswers);
+      const generatedReport = evaluatePlacementSubmission(effectiveStudentInfo, userAnswers);
       setReport(generatedReport);
       onFinishTest(generatedReport);
     }
@@ -226,11 +239,14 @@ export const PlacementTestRunner: React.FC<PlacementTestRunnerProps> = ({
     let content = `====================================================\n`;
     content += `         MCC PLACEMENT TEST EVALUATION REPORT       \n`;
     content += `====================================================\n\n`;
-    content += `Student Name: ${report.username}\n`;
-    content += `Student Email: ${report.email}\n`;
-    content += `Assessment: ${report.testTitle}\n`;
-    content += `Timestamp: ${report.timestamp}\n`;
-    content += `Security Violations Recorded: ${violationsCount}\n`;
+    content += `Student Name:     ${report.username}\n`;
+    content += `Student Email:    ${report.email}\n`;
+    content += `Department:       ${report.department || effectiveStudentInfo.department}\n`;
+    content += `Year / Section:   Year ${report.year || effectiveStudentInfo.year} - Sec ${report.section || effectiveStudentInfo.section}\n`;
+    content += `Roll Number:      ${report.rollNumber || effectiveStudentInfo.rollNumber}\n`;
+    content += `Assessment:       ${report.testTitle}\n`;
+    content += `Timestamp:        ${report.timestamp}\n`;
+    content += `Security Violations: ${violationsCount}\n`;
     content += `----------------------------------------------------\n`;
     content += `Score: ${report.score} / ${report.totalQuestions * 25} (${report.percentage}%)\n`;
     content += `Correct Answers: ${report.correctAnswersCount}\n`;
@@ -269,7 +285,7 @@ export const PlacementTestRunner: React.FC<PlacementTestRunnerProps> = ({
       <div className="space-y-8 animate-fade-in max-w-4xl mx-auto">
         {/* Report Overview Header */}
         <div className="p-6 sm:p-8 rounded-2xl bg-[#0D1B2A] border border-white/10 shadow-2xl space-y-6">
-          <div className="pb-4 border-b border-white/10 flex items-center justify-between">
+          <div className="pb-4 border-b border-white/10 flex items-center justify-between flex-wrap gap-4">
             <div className="flex items-center space-x-3">
               <div className="p-3 rounded-xl bg-emerald-500/10 text-emerald-400 border border-emerald-500/20">
                 <FileText className="w-6 h-6" />
@@ -279,7 +295,7 @@ export const PlacementTestRunner: React.FC<PlacementTestRunnerProps> = ({
                   Placement Evaluation Report
                 </h3>
                 <p className="text-xs text-[#94A3B8]">
-                  Candidate: <strong className="text-white">{report.username}</strong> ({report.email})
+                  Candidate: <strong className="text-white">{report.username}</strong> ({report.email}) • {report.department || effectiveStudentInfo.department} (Year {report.year || effectiveStudentInfo.year}-{report.section || effectiveStudentInfo.section}) • Roll: {report.rollNumber || effectiveStudentInfo.rollNumber}
                 </p>
               </div>
             </div>

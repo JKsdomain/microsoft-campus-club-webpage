@@ -12,12 +12,10 @@ import {
   Rss,
   LogOut,
   X,
-  UserCheck,
   ShieldAlert,
   History,
 } from "lucide-react";
 import { useOBAuth } from "./OBAuthProvider";
-import { PRESET_OBS } from "@/lib/obState";
 
 interface OBSidebarProps {
   mobileOpen?: boolean;
@@ -30,7 +28,7 @@ export const OBSidebar: React.FC<OBSidebarProps> = ({
 }) => {
   const pathname = usePathname();
   const router = useRouter();
-  const { currentOb, logoutOb, switchObPersona } = useOBAuth();
+  const { currentOb, logoutOb } = useOBAuth();
 
   const handleLogout = async () => {
     await logoutOb();
@@ -198,28 +196,8 @@ export const OBSidebar: React.FC<OBSidebarProps> = ({
         </div>
       </div>
 
-      {/* Demo Switcher & Logout */}
-      <div className="pt-4 border-t border-white/10 mt-auto space-y-3">
-        {/* Switch Persona for testing single responsibility assigned to different OBs */}
-        <div className="p-2.5 rounded-xl bg-[#07111F] border border-white/10 space-y-1.5">
-          <div className="flex items-center justify-between text-[11px] font-mono text-[#94A3B8]">
-            <span className="flex items-center gap-1">
-              <UserCheck className="w-3 h-3 text-[#22D3EE]" /> Active OB Persona
-            </span>
-          </div>
-          <select
-            value={currentOb.id}
-            onChange={(e) => switchObPersona(e.target.value)}
-            className="w-full text-xs bg-[#0D1B2A] border border-white/15 text-[#F8FAFC] rounded-lg p-1.5 focus:outline-none"
-          >
-            {PRESET_OBS.map((ob) => (
-              <option key={ob.id} value={ob.id}>
-                {ob.name} ({ob.assignedResponsibility})
-              </option>
-            ))}
-          </select>
-        </div>
-
+      {/* Logout */}
+      <div className="pt-4 border-t border-white/10 mt-auto">
         <button
           onClick={handleLogout}
           className="w-full flex items-center gap-3 px-3.5 py-2.5 rounded-xl text-sm font-medium text-red-400 hover:text-red-300 hover:bg-red-500/10 transition-colors"
