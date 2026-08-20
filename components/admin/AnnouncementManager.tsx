@@ -379,15 +379,9 @@ export const AnnouncementManager: React.FC = () => {
                   onChange={(e) => setStatus(e.target.value as any)}
                   className="w-full h-11 px-3.5 rounded-xl bg-[#07111F] border border-white/15 text-[#F8FAFC] text-sm focus:outline-none focus:border-[#0078D4]"
                 >
-                  <option value="PUBLISHED" className="bg-[#07111F] text-[#F8FAFC]">
-                    Published
-                  </option>
-                  <option value="DRAFT" className="bg-[#07111F] text-[#F8FAFC]">
-                    Draft
-                  </option>
-                  <option value="ARCHIVED" className="bg-[#07111F] text-[#F8FAFC]">
-                    Archived
-                  </option>
+                  <option value="PUBLISHED">Published</option>
+                  <option value="DRAFT">Draft</option>
+                  <option value="ARCHIVED">Archived</option>
                 </select>
               </div>
 

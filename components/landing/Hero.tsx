@@ -31,7 +31,7 @@ export const Hero: React.FC = () => {
             <h1 className="text-[38px] sm:text-5xl lg:text-[64px] font-bold text-[#F8FAFC] tracking-tight leading-[1.05]">
               Connect. <br />
               Collaborate. <br />
-              <span className="text-transparent bg-clip-text bg-gradient-to-r from-[#F8FAFC] via-[#CBD5E1] to-[#0078D4]">
+              <span className="text-transparent bg-clip-text bg-gradient-to-r from-[#0078D4] via-[#0284C7] to-[#0891B2] dark:from-[#F8FAFC] dark:via-[#CBD5E1] dark:to-[#0078D4]">
                 Build.
               </span>
             </h1>

@@ -507,8 +507,8 @@ export const PlacementTestRunner: React.FC<PlacementTestRunnerProps> = ({
                 onClick={() => handleSelectAnswer(currentQ.id, opt)}
                 className={`w-full p-4 rounded-xl text-left text-sm font-medium transition-all flex items-center justify-between border ${
                   isSelected
-                    ? "bg-[#0078D4]/20 border-[#0078D4] text-white shadow-md shadow-[#0078D4]/20"
-                    : "bg-[#07111F] border-white/10 text-[#CBD5E1] hover:border-white/25 hover:text-white"
+                    ? "bg-[#0078D4]/20 border-[#0078D4] text-[#0078D4] dark:text-white font-semibold shadow-md shadow-[#0078D4]/20"
+                    : "bg-[#07111F] border-white/10 text-[#CBD5E1] hover:border-[#0078D4] dark:hover:border-white/25 hover:text-[#0078D4] dark:hover:text-white"
                 }`}
               >
                 <span>{opt}</span>

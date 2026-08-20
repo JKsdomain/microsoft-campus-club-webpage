@@ -43,7 +43,7 @@ export const QuizTestRunner: React.FC<QuizTestRunnerProps> = ({
   const [questions] = useState(() => getPublicQuizQuestions());
 
   // Timestamp-based elapsed timer to maintain accurate countdown across tab/window switches
-  const startTimeRef = React.useRef<number>(Date.now());
+  const startTimeRef = React.useRef<number | null>(null);
   const submittedRef = React.useRef(false);
 
   const handleSubmitQuiz = React.useCallback(async () => {
@@ -81,9 +81,13 @@ export const QuizTestRunner: React.FC<QuizTestRunnerProps> = ({
 
   useEffect(() => {
     if (report) return;
+    if (startTimeRef.current === null) {
+      startTimeRef.current = Date.now();
+    }
 
     const updateTimer = () => {
-      const elapsed = Math.floor((Date.now() - startTimeRef.current) / 1000);
+      const start = startTimeRef.current || Date.now();
+      const elapsed = Math.floor((Date.now() - start) / 1000);
       const remaining = Math.max(0, totalDuration - elapsed);
       setTimeLeftSeconds(remaining);
 
@@ -297,8 +301,8 @@ export const QuizTestRunner: React.FC<QuizTestRunnerProps> = ({
                 onClick={() => handleSelectAnswer(currentQ.id, opt)}
                 className={`w-full p-4 rounded-xl text-left text-sm font-medium transition-all flex items-center justify-between border ${
                   isSelected
-                    ? "bg-[#0078D4]/20 border-[#0078D4] text-white shadow-md shadow-[#0078D4]/20"
-                    : "bg-[#07111F] border-white/10 text-[#CBD5E1] hover:border-white/25 hover:text-white"
+                    ? "bg-[#0078D4]/20 border-[#0078D4] text-[#0078D4] dark:text-white font-semibold shadow-md shadow-[#0078D4]/20"
+                    : "bg-[#07111F] border-white/10 text-[#CBD5E1] hover:border-[#0078D4] dark:hover:border-white/25 hover:text-[#0078D4] dark:hover:text-white"
                 }`}
               >
                 <span>{opt}</span>

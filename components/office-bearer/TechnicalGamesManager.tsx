@@ -167,6 +167,29 @@ export const TechnicalGamesManager: React.FC = () => {
 
         {/* Right Info Column */}
         <div className="space-y-6">
+          {/* Live External Platform Card */}
+          <div className="p-6 rounded-2xl bg-[#0D1B2A] border border-[#0078D4]/30 shadow-xl space-y-4">
+            <div className="flex items-center space-x-3">
+              <div className="p-2 rounded-lg bg-[#0078D4]/10 text-[#22D3EE]">
+                <Gamepad2 className="w-5 h-5" />
+              </div>
+              <h3 className="text-base font-bold text-[#F8FAFC]">
+                Live Games Arena
+              </h3>
+            </div>
+            <p className="text-xs text-[#CBD5E1] leading-relaxed">
+              Launch and test the live games arena on the official Technical Games platform.
+            </p>
+            <Button
+              href="https://technical-game-homepage.vercel.app/#games"
+              variant="primary"
+              size="md"
+              className="w-full justify-center"
+            >
+              Open Games Platform
+            </Button>
+          </div>
+
           <div className="p-6 rounded-2xl bg-[#0D1B2A] border border-white/10 shadow-xl space-y-4">
             <h3 className="text-base font-bold text-[#F8FAFC] pb-2 border-b border-white/10">
               Active Challenge Arenas

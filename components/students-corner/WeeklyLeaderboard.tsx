@@ -71,7 +71,7 @@ export const WeeklyLeaderboard: React.FC<WeeklyLeaderboardProps> = ({
             Official MCC Placement Assessment Rankings • Week {weekNumber}
             {publishedBy && (
               <span className="text-[#94A3B8] block mt-0.5">
-                Published by <strong className="text-white">{publishedBy}</strong> ({publishedByRole === "ADMIN" ? "Administrator" : "Placement Lead"})
+                Published by <strong className="text-white">{publishedBy}</strong> ({publishedByRole === "ADMIN" ? "Administrator" : "Placement Lead"}){publishedAt ? ` • ${new Date(publishedAt).toLocaleDateString()}` : ""}
               </span>
             )}
           </p>

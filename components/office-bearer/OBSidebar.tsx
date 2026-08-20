@@ -52,7 +52,7 @@ export const OBSidebar: React.FC<OBSidebarProps> = ({
     },
     "Technical Games": {
       label: "Technical Games",
-      href: "/office-bearer/technical-games",
+      href: "https://technical-game-homepage.vercel.app/#games",
       icon: Gamepad2,
     },
     "Feed Community": {
@@ -192,22 +192,16 @@ export const OBSidebar: React.FC<OBSidebarProps> = ({
             />
             <span>Feed</span>
           </Link>
-          <Link
-            href="/office-bearer/technical-games"
+          <a
+            href="https://technical-game-homepage.vercel.app/#games"
+            target="_blank"
+            rel="noopener noreferrer"
             onClick={onCloseMobile}
-            className={`flex items-center gap-3 px-3.5 py-2.5 rounded-xl text-sm font-medium transition-all duration-150 ${
-              pathname === "/office-bearer/technical-games"
-                ? "bg-[#0078D4] text-white shadow-md shadow-[#0078D4]/20"
-                : "text-[#CBD5E1] hover:text-white hover:bg-white/[0.06]"
-            }`}
+            className="flex items-center gap-3 px-3.5 py-2.5 rounded-xl text-sm font-medium transition-all duration-150 text-[#CBD5E1] hover:text-white hover:bg-white/[0.06]"
           >
-            <Gamepad2
-              className={`w-4 h-4 ${
-                pathname === "/office-bearer/technical-games" ? "text-white" : "text-emerald-400"
-              }`}
-            />
+            <Gamepad2 className="w-4 h-4 text-emerald-400" />
             <span>Technical Games</span>
-          </Link>
+          </a>
         </div>
       </div>
 

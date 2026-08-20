@@ -49,13 +49,16 @@ function StudentsCornerInner() {
 
   useEffect(() => {
     const tabParam = searchParams.get("tab") as TabType | null;
+    if (tabParam === "technical-games") {
+      window.location.replace("https://technical-game-homepage.vercel.app/#games");
+      return;
+    }
     if (
       tabParam &&
       [
         "overview",
         "placement-questions",
         "general-quiz",
-        "technical-games",
         "feed",
         "history",
         "leaderboard",
@@ -219,7 +222,7 @@ function StudentsCornerInner() {
         {studentInfo && (
           <div className="flex items-center space-x-2 px-3 py-1.5 rounded-xl bg-[#0D1B2A] border border-white/10 text-xs">
             <ShieldCheck className="w-4 h-4 text-emerald-400" />
-            <span className="font-semibold text-white">{studentInfo.name}</span>
+            <span className="font-semibold text-[#F8FAFC]">{studentInfo.name}</span>
             <span className="text-[#94A3B8] text-[11px] font-mono">({studentInfo.department})</span>
           </div>
         )}
@@ -231,6 +234,18 @@ function StudentsCornerInner() {
           {tabs.map((t) => {
             const Icon = t.icon;
             const isActive = activeTab === t.id;
+            if (t.id === "technical-games") {
+              return (
+                <a
+                  key={t.id}
+                  href="https://technical-game-homepage.vercel.app/#games"
+                  className="flex items-center space-x-2 px-4 py-2 rounded-xl text-xs font-semibold transition-all text-[#CBD5E1] hover:text-[#0078D4] dark:hover:text-white hover:bg-slate-100 dark:hover:bg-white/[0.06]"
+                >
+                  <Icon className="w-4 h-4 text-[#22D3EE]" />
+                  <span>{t.label}</span>
+                </a>
+              );
+            }
             return (
               <button
                 key={t.id}
@@ -238,7 +253,7 @@ function StudentsCornerInner() {
                 className={`flex items-center space-x-2 px-4 py-2 rounded-xl text-xs font-semibold transition-all ${
                   isActive
                     ? "bg-[#0078D4] text-white shadow-md shadow-[#0078D4]/20"
-                    : "text-[#CBD5E1] hover:text-white hover:bg-white/[0.06]"
+                    : "text-[#CBD5E1] hover:text-[#0078D4] dark:hover:text-white hover:bg-slate-100 dark:hover:bg-white/[0.06]"
                 }`}
               >
                 <Icon className={`w-4 h-4 ${isActive ? "text-white" : "text-[#22D3EE]"}`} />
@@ -255,7 +270,7 @@ function StudentsCornerInner() {
         {activeTab === "overview" && (
           <div className="space-y-10 animate-fade-in">
             {/* Hero Overview Banner */}
-            <div className="p-8 sm:p-12 rounded-3xl bg-gradient-to-br from-[#0D1B2A] via-[#07111F] to-[#0078D4]/20 border border-white/10 shadow-2xl relative overflow-hidden space-y-4">
+            <div className="students-corner-hero p-8 sm:p-12 rounded-3xl bg-gradient-to-br from-[#0D1B2A] via-[#07111F] to-[#0078D4]/20 border border-white/10 shadow-2xl relative overflow-hidden space-y-4">
               <div className="inline-flex items-center space-x-2 px-3.5 py-1 rounded-full bg-[#0078D4]/10 border border-[#0078D4]/30 text-xs font-mono text-[#22D3EE]">
                 <Sparkles className="w-3.5 h-3.5" />
                 <span>STUDENT ACTIVITY HUB</span>
@@ -408,7 +423,6 @@ function StudentsCornerInner() {
 
               {/* Card 3: Technical Games */}
               {(() => {
-                const status = activityAvailability["Technical Games"] || "COMING SOON";
                 return (
                   <div className="p-6 rounded-2xl bg-[#0D1B2A] border border-white/10 shadow-xl flex flex-col justify-between space-y-4 hover:border-[#0078D4]/40 transition-all">
                     <div className="space-y-3">
@@ -416,24 +430,10 @@ function StudentsCornerInner() {
                         <div className="w-10 h-10 rounded-xl bg-emerald-500/20 border border-emerald-500/30 flex items-center justify-center text-emerald-400">
                           <Gamepad2 className="w-5 h-5" />
                         </div>
-                        {status === "OPEN" && (
-                          <span className="inline-flex items-center gap-1 text-[11px] font-semibold text-emerald-400 bg-emerald-500/10 px-2.5 py-0.5 rounded-full border border-emerald-500/20">
-                            <span className="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-pulse" />
-                            OPEN
-                          </span>
-                        )}
-                        {status === "CLOSED" && (
-                          <span className="inline-flex items-center gap-1 text-[11px] font-semibold text-red-400 bg-red-500/10 px-2.5 py-0.5 rounded-full border border-red-500/20">
-                            <span className="w-1.5 h-1.5 rounded-full bg-red-400" />
-                            CLOSED
-                          </span>
-                        )}
-                        {status === "COMING SOON" && (
-                          <span className="inline-flex items-center gap-1 text-[11px] font-semibold text-amber-400 bg-amber-500/10 px-2.5 py-0.5 rounded-full border border-amber-500/20">
-                            <span className="w-1.5 h-1.5 rounded-full bg-amber-400" />
-                            COMING SOON
-                          </span>
-                        )}
+                        <span className="inline-flex items-center gap-1 text-[11px] font-semibold text-emerald-400 bg-emerald-500/10 px-2.5 py-0.5 rounded-full border border-emerald-500/20">
+                          <span className="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-pulse" />
+                          LIVE ARENA
+                        </span>
                       </div>
                       <div>
                         <span className="text-[11px] font-mono text-emerald-400 block mb-0.5">Hands-on Debugging</span>
@@ -444,20 +444,12 @@ function StudentsCornerInner() {
                       </p>
                     </div>
                     <Button
-                      onClick={() => {
-                        if (status === "CLOSED") {
-                          setBlockedMessage("This activity is currently closed.");
-                        } else if (status === "COMING SOON") {
-                          setBlockedMessage("This activity is not available yet.");
-                        } else {
-                          setActiveTab("technical-games");
-                        }
-                      }}
+                      href="https://technical-game-homepage.vercel.app/#games"
                       variant="secondary"
                       size="md"
                       rightIcon={<ArrowRight className="w-4 h-4" />}
                     >
-                      View Technical Games
+                      Play Technical Games
                     </Button>
                   </div>
                 );
@@ -636,56 +628,27 @@ function StudentsCornerInner() {
 
         {/* TAB 4: TECHNICAL GAMES */}
         {activeTab === "technical-games" && (
-          <div className="space-y-6 max-w-4xl mx-auto animate-fade-in">
-            {(activityAvailability["Technical Games"] || "COMING SOON") === "CLOSED" ? (
-              <div className="p-12 text-center rounded-2xl bg-[#0D1B2A] border border-red-500/20 max-w-xl mx-auto space-y-5">
-                <div className="w-14 h-14 rounded-full bg-red-500/10 border border-red-500/30 text-red-400 flex items-center justify-center mx-auto">
-                  <AlertTriangle className="w-7 h-7" />
-                </div>
-                <div>
-                  <h3 className="text-2xl font-bold text-[#F8FAFC]">Technical Games Closed</h3>
-                  <p className="text-xs text-[#CBD5E1] mt-1.5 leading-relaxed">
-                    This arena is currently closed by the administrator. Please check back later.
-                  </p>
-                </div>
-                <Button
-                  onClick={() => setActiveTab("overview")}
-                  variant="outline"
-                  size="md"
-                >
-                  Return to Overview
-                </Button>
+          <div className="space-y-6 max-w-4xl mx-auto animate-fade-in text-center py-8">
+            <div className="p-8 sm:p-12 rounded-2xl bg-[#0D1B2A] border border-white/10 shadow-2xl space-y-6 max-w-xl mx-auto">
+              <div className="w-16 h-16 rounded-2xl bg-emerald-500/10 border border-emerald-500/30 flex items-center justify-center mx-auto text-emerald-400">
+                <Gamepad2 className="w-8 h-8" />
               </div>
-            ) : (
-              <div className="p-8 rounded-2xl bg-[#0D1B2A] border border-white/10 shadow-xl space-y-4 text-center">
-                <Gamepad2 className="w-12 h-12 text-emerald-400 mx-auto" />
-                <h3 className="text-2xl font-bold text-[#F8FAFC]">Technical Games Arena</h3>
-                <p className="text-xs text-[#CBD5E1] max-w-md mx-auto">
-                  Explore published technical gaming rounds, speed debugging challenges, and IoT hacking arenas.
+              <div>
+                <h3 className="text-2xl font-bold text-[#F8FAFC]">MCC Technical Games</h3>
+                <p className="text-xs text-[#CBD5E1] mt-2 leading-relaxed">
+                  Participate in hands-on technical micro-challenges, IoT speed debugging, and CTF coding arenas hosted on the official Technical Games platform.
                 </p>
-
-                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 text-left pt-4">
-                  <div className="p-4 rounded-xl bg-[#07111F] border border-white/10 space-y-2">
-                    <span className="text-xs font-bold text-[#22D3EE] block">Azure Speed Challenge</span>
-                    <p className="text-xs text-[#94A3B8]">
-                      Embedded micro-challenge round focused on Cloud API latency optimization.
-                    </p>
-                    <span className="inline-block px-2.5 py-0.5 rounded text-[10px] bg-emerald-500/10 text-emerald-400">
-                      Live Arena
-                    </span>
-                  </div>
-                  <div className="p-4 rounded-xl bg-[#07111F] border border-white/10 space-y-2">
-                    <span className="text-xs font-bold text-amber-400 block">CTF Binary Exploitation</span>
-                    <p className="text-xs text-[#94A3B8]">
-                      Find vulnerabilities in compiled binaries and submit secret flag strings.
-                    </p>
-                    <span className="inline-block px-2.5 py-0.5 rounded text-[10px] bg-amber-500/10 text-amber-400">
-                      Upcoming Round
-                    </span>
-                  </div>
-                </div>
               </div>
-            )}
+              <Button
+                href="https://technical-game-homepage.vercel.app/#games"
+                variant="primary"
+                size="lg"
+                rightIcon={<ArrowRight className="w-4 h-4" />}
+                className="bg-[#0078D4] hover:bg-[#0078D4]/80 w-full sm:w-auto"
+              >
+                Launch Technical Games Arena
+              </Button>
+            </div>
           </div>
         )}
 

@@ -1,5 +1,4 @@
 import React from "react";
-import Link from "next/link";
 import { ArrowLeft, Clock } from "lucide-react";
 import { Container } from "./Container";
 import { Button } from "./Button";

@@ -78,7 +78,7 @@ export const OBDashboard: React.FC = () => {
   let manageHref = "/office-bearer/dashboard";
   if (respName === "General Quiz") manageHref = "/office-bearer/general-quiz";
   if (respName === "Placement Questions") manageHref = "/office-bearer/placement-questions";
-  if (respName === "Technical Games") manageHref = "/office-bearer/technical-games";
+  if (respName === "Technical Games") manageHref = "https://technical-game-homepage.vercel.app/#games";
   if (respName === "Feed Community") manageHref = "/office-bearer/feed-community";
 
   return (

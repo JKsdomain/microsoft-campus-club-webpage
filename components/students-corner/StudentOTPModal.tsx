@@ -1,7 +1,7 @@
 "use client";
 
 import React, { useState, useEffect } from "react";
-import { Mail, CheckCircle2, AlertCircle, RefreshCw, X, ShieldCheck } from "lucide-react";
+import { Mail, AlertCircle, RefreshCw, X, ShieldCheck } from "lucide-react";
 import { Button } from "../ui/Button";
 
 interface StudentOTPModalProps {

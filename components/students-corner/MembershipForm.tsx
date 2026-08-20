@@ -255,7 +255,7 @@ export const MembershipForm: React.FC = () => {
                 className="w-full h-11 px-3.5 rounded-xl bg-[#07111F] border border-white/15 text-[#F8FAFC] text-sm focus:outline-none focus:border-[#0078D4]"
               >
                 {DEPARTMENTS.map((dept) => (
-                  <option key={dept} value={dept} className="bg-[#07111F] text-[#F8FAFC]">
+                  <option key={dept} value={dept}>
                     {dept}
                   </option>
                 ))}
@@ -273,7 +273,7 @@ export const MembershipForm: React.FC = () => {
                 className="w-full h-11 px-3.5 rounded-xl bg-[#07111F] border border-white/15 text-[#F8FAFC] text-sm focus:outline-none focus:border-[#0078D4]"
               >
                 {GENDERS.map((g) => (
-                  <option key={g} value={g} className="bg-[#07111F] text-[#F8FAFC]">
+                  <option key={g} value={g}>
                     {g}
                   </option>
                 ))}
@@ -291,7 +291,7 @@ export const MembershipForm: React.FC = () => {
                 className="w-full h-11 px-3.5 rounded-xl bg-[#07111F] border border-white/15 text-[#F8FAFC] text-sm focus:outline-none focus:border-[#0078D4]"
               >
                 {SEMESTERS.map((sem) => (
-                  <option key={sem} value={sem} className="bg-[#07111F] text-[#F8FAFC]">
+                  <option key={sem} value={sem}>
                     {sem}
                   </option>
                 ))}
@@ -323,7 +323,7 @@ export const MembershipForm: React.FC = () => {
                 className="w-full h-11 px-3.5 rounded-xl bg-[#07111F] border border-white/15 text-[#F8FAFC] text-sm focus:outline-none focus:border-[#0078D4]"
               >
                 {BATCHES.map((b) => (
-                  <option key={b} value={b} className="bg-[#07111F] text-[#F8FAFC]">
+                  <option key={b} value={b}>
                     {b}
                   </option>
                 ))}
@@ -341,7 +341,7 @@ export const MembershipForm: React.FC = () => {
                 className="w-full h-11 px-3.5 rounded-xl bg-[#07111F] border border-white/15 text-[#F8FAFC] text-sm focus:outline-none focus:border-[#0078D4]"
               >
                 {RESIDENCE_TYPES.map((res) => (
-                  <option key={res} value={res} className="bg-[#07111F] text-[#F8FAFC]">
+                  <option key={res} value={res}>
                     {res}
                   </option>
                 ))}
@@ -392,8 +392,8 @@ export const MembershipForm: React.FC = () => {
                     onClick={() => toggleCompetency(comp)}
                     className={`p-3 rounded-xl border text-xs font-medium transition-all text-left flex items-center justify-between ${
                       isSelected
-                        ? "bg-[#0078D4]/20 border-[#0078D4] text-white"
-                        : "bg-[#07111F] border-white/15 text-[#CBD5E1] hover:border-white/30"
+                        ? "bg-[#0078D4]/20 border-[#0078D4] text-[#0078D4] dark:text-white font-semibold"
+                        : "bg-[#07111F] border-white/15 text-[#CBD5E1] hover:border-[#0078D4] dark:hover:border-white/30"
                     }`}
                   >
                     <span>{comp}</span>

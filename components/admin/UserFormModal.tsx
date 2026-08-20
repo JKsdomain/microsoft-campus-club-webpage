@@ -138,7 +138,7 @@ export const UserFormModal: React.FC<UserFormModalProps> = ({
                 className="w-full h-11 px-3.5 rounded-xl bg-[#07111F] border border-white/15 text-[#F8FAFC] text-sm focus:outline-none focus:border-[#0078D4]"
               >
                 {DEPARTMENTS.map((dept) => (
-                  <option key={dept} value={dept} className="bg-[#07111F] text-[#F8FAFC]">
+                  <option key={dept} value={dept}>
                     {dept}
                   </option>
                 ))}
@@ -155,7 +155,7 @@ export const UserFormModal: React.FC<UserFormModalProps> = ({
                 className="w-full h-11 px-3.5 rounded-xl bg-[#07111F] border border-white/15 text-[#F8FAFC] text-sm focus:outline-none focus:border-[#0078D4]"
               >
                 {RESPONSIBILITIES.map((resp) => (
-                  <option key={resp} value={resp} className="bg-[#07111F] text-[#F8FAFC]">
+                  <option key={resp} value={resp}>
                     {resp}
                   </option>
                 ))}

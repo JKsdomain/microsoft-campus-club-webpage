@@ -11,7 +11,7 @@ import { ThemeToggle } from "../ui/ThemeToggle";
 const NAV_ITEMS = [
   { label: "Home", href: "/" },
   { label: "Students Corner", href: "/students-corner" },
-  { label: "Technical Games", href: "/students-corner?tab=technical-games" },
+  { label: "Technical Games", href: "https://technical-game-homepage.vercel.app/#games" },
   { label: "Announcements", href: "/announcements" },
 ];
 
@@ -70,8 +70,17 @@ export const Navbar: React.FC = () => {
           {/* Desktop Navigation Links */}
           <nav className="hidden lg:flex items-center space-x-1 xl:space-x-2">
             {NAV_ITEMS.map((item) => {
-              const isActive = pathname === item.href;
-              return (
+              const isExternal = item.href.startsWith("http");
+              const isActive = !isExternal && pathname === item.href;
+              return isExternal ? (
+                <a
+                  key={item.label}
+                  href={item.href}
+                  className="px-3 py-2 text-sm font-medium rounded-md transition-colors text-[#CBD5E1] hover:text-[#F8FAFC] hover:bg-white/[0.04]"
+                >
+                  {item.label}
+                </a>
+              ) : (
                 <Link
                   key={item.label}
                   href={item.href}
@@ -130,8 +139,18 @@ export const Navbar: React.FC = () => {
           <div className="lg:hidden mt-4 pb-6 pt-2 border-t border-white/10 space-y-4 animate-fade-in">
             <div className="flex flex-col space-y-1">
               {NAV_ITEMS.map((item) => {
-                const isActive = pathname === item.href;
-                return (
+                const isExternal = item.href.startsWith("http");
+                const isActive = !isExternal && pathname === item.href;
+                return isExternal ? (
+                  <a
+                    key={item.label}
+                    href={item.href}
+                    onClick={() => setMobileMenuOpen(false)}
+                    className="px-4 py-2.5 text-base font-medium rounded-lg transition-colors text-[#CBD5E1] hover:text-white hover:bg-white/[0.04]"
+                  >
+                    {item.label}
+                  </a>
+                ) : (
                   <Link
                     key={item.label}
                     href={item.href}
