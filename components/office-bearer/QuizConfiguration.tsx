@@ -610,12 +610,14 @@ export const QuizConfiguration: React.FC<QuizConfigurationProps> = ({
             </div>
           </div>
 
-          {/* Leaderboard Publication Control for this Activity */}
-          <LeaderboardPublishCard
-            role="OFFICE_BEARER"
-            assignedResponsibility={activityType}
-            activityType={activityType}
-          />
+          {/* Leaderboard Publication Control (Strictly Placement Questions Only) */}
+          {activityType === "Placement Questions" && (
+            <LeaderboardPublishCard
+              role="OFFICE_BEARER"
+              assignedResponsibility={activityType}
+              activityType={activityType}
+            />
+          )}
 
           {/* Submissions Status List */}
           <div className="p-6 rounded-2xl bg-[#0D1B2A] border border-white/10 shadow-xl space-y-4">

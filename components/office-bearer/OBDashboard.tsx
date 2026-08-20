@@ -140,8 +140,8 @@ export const OBDashboard: React.FC = () => {
         </div>
       )}
 
-      {/* Leaderboard Publication Control for Responsible Office Bearer */}
-      {(respName === "General Quiz" || respName === "Placement Questions") && (
+      {/* Leaderboard Publication Control for Responsible Placement Office Bearer */}
+      {respName === "Placement Questions" && (
         <LeaderboardPublishCard
           role="OFFICE_BEARER"
           assignedResponsibility={respName}

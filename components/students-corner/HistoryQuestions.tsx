@@ -1,13 +1,83 @@
 "use client";
 
-import React, { useState } from "react";
-import { HISTORY_PLACEMENT_SETS, HistorySet } from "@/lib/studentState";
-import { History, Calendar, CheckCircle2, Eye, ArrowLeft, BookOpen, HelpCircle } from "lucide-react";
+import React, { useState, useEffect } from "react";
+import { HistorySet } from "@/lib/studentState";
+import { History, Calendar, CheckCircle2, Eye, ArrowLeft, BookOpen, HelpCircle, Download, Bell, AlertTriangle } from "lucide-react";
 import { Button } from "../ui/Button";
 import { EmptyState } from "../ui/EmptyState";
+import { LoadingState } from "../ui/LoadingState";
 
 export const HistoryQuestions: React.FC = () => {
+  const [historySets, setHistorySets] = useState<HistorySet[]>([]);
+  const [bannerNotice, setBannerNotice] = useState<string | null>(null);
   const [selectedSet, setSelectedSet] = useState<HistorySet | null>(null);
+  const [loading, setLoading] = useState(true);
+  const [downloadingId, setDownloadingId] = useState<string | null>(null);
+
+  // Load history questions and dynamic lifecycle notification from MongoDB API
+  useEffect(() => {
+    const fetchHistory = async () => {
+      try {
+        setLoading(true);
+        const res = await fetch("/api/students-corner/history-questions");
+        if (res.ok) {
+          const data = await res.json();
+          if (Array.isArray(data.historySets)) {
+            setHistorySets(data.historySets);
+          }
+          if (data.bannerNotice) {
+            setBannerNotice(data.bannerNotice);
+          }
+        }
+      } catch (err) {
+        console.error("Failed to load history questions:", err);
+      } finally {
+        setLoading(false);
+      }
+    };
+    fetchHistory();
+  }, []);
+
+  // Handle genuine PDF download via pdf-lib API
+  const handleDownloadPDF = async (set: HistorySet) => {
+    setDownloadingId(set.id);
+    try {
+      const res = await fetch("/api/students-corner/history-questions/download-pdf", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          id: set.id,
+          title: set.title,
+          weekName: set.weekName,
+          publishedDate: set.completedDate,
+          expiryDate: (set as any).expiresAt,
+          questions: set.questions,
+        }),
+      });
+
+      if (res.ok) {
+        const blob = await res.blob();
+        const url = window.URL.createObjectURL(blob);
+        const a = document.createElement("a");
+        a.href = url;
+        const safeTitle = (set.weekName || set.title || "placement-questions")
+          .toLowerCase()
+          .replace(/[^a-z0-9]+/g, "-");
+        a.download = `mcc-${safeTitle}.pdf`;
+        document.body.appendChild(a);
+        a.click();
+        a.remove();
+        window.URL.revokeObjectURL(url);
+      } else {
+        alert("Failed to download history questions PDF.");
+      }
+    } catch (e) {
+      console.error("PDF download error:", e);
+      alert("Network error while downloading PDF.");
+    } finally {
+      setDownloadingId(null);
+    }
+  };
 
   // If student is viewing questions of a selected historical Placement Question set:
   if (selectedSet) {
@@ -24,7 +94,17 @@ export const HistoryQuestions: React.FC = () => {
             Back to History Archive
           </Button>
 
-          <div className="flex items-center space-x-2">
+          <div className="flex items-center space-x-3">
+            <Button
+              onClick={() => handleDownloadPDF(selectedSet)}
+              disabled={downloadingId === selectedSet.id}
+              variant="outline"
+              size="sm"
+              leftIcon={<Download className="w-3.5 h-3.5" />}
+              className="text-[#22D3EE] border-[#22D3EE]/30 hover:bg-[#22D3EE]/10"
+            >
+              {downloadingId === selectedSet.id ? "Generating PDF..." : "Download PDF"}
+            </Button>
             <span className="text-xs font-mono text-[#0078D4] bg-[#0078D4]/10 px-3 py-1 rounded-full border border-[#0078D4]/30">
               {selectedSet.weekName}
             </span>
@@ -36,9 +116,16 @@ export const HistoryQuestions: React.FC = () => {
 
         {/* Set Info Header */}
         <div className="p-6 sm:p-8 rounded-2xl bg-[#0D1B2A] border border-white/10 shadow-xl space-y-3">
-          <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-emerald-500/10 text-emerald-400 border border-emerald-500/20 text-xs font-mono">
-            <BookOpen className="w-3.5 h-3.5" />
-            <span>READ-ONLY EDUCATIONAL REVISION</span>
+          <div className="flex flex-wrap items-center justify-between gap-2">
+            <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-emerald-500/10 text-emerald-400 border border-emerald-500/20 text-xs font-mono">
+              <BookOpen className="w-3.5 h-3.5" />
+              <span>READ-ONLY EDUCATIONAL REVISION</span>
+            </div>
+            {(selectedSet as any).expiresAt && (
+              <span className="text-xs font-mono text-amber-400 bg-amber-500/10 px-2.5 py-1 rounded border border-amber-500/20">
+                Archival Date: {(selectedSet as any).expiresAt}
+              </span>
+            )}
           </div>
           <h2 className="text-2xl font-bold text-[#F8FAFC]">{selectedSet.title}</h2>
           <p className="text-xs text-[#94A3B8] font-mono">
@@ -134,19 +221,36 @@ export const HistoryQuestions: React.FC = () => {
   const [visibleCount, setVisibleCount] = useState(PAGE_SIZE);
   const [loadingMore, setLoadingMore] = useState(false);
 
-  const visibleSets = HISTORY_PLACEMENT_SETS.slice(0, visibleCount);
-  const hasMore = visibleCount < HISTORY_PLACEMENT_SETS.length;
+  const visibleSets = historySets.slice(0, visibleCount);
+  const hasMore = visibleCount < historySets.length;
 
   const handleLoadMore = () => {
     setLoadingMore(true);
     setTimeout(() => {
       setVisibleCount((prev) => prev + PAGE_SIZE);
       setLoadingMore(false);
-    }, 400);
+    }, 300);
   };
 
   return (
-    <div className="space-y-8 max-w-4xl mx-auto animate-fade-in">
+    <div className="space-y-6 max-w-4xl mx-auto animate-fade-in">
+      {/* Marquee Expiry Notification Banner (Issue 20) */}
+      {bannerNotice && (
+        <div className="overflow-hidden rounded-xl bg-gradient-to-r from-[#0078D4]/20 via-[#0D1B2A] to-[#22D3EE]/20 border border-[#0078D4]/30 p-3 shadow-lg">
+          <div className="flex items-center gap-3">
+            <div className="flex-shrink-0 flex items-center gap-1.5 px-2.5 py-1 rounded-md bg-[#0078D4]/30 text-[#22D3EE] text-xs font-mono font-bold">
+              <Bell className="w-3.5 h-3.5 animate-pulse" />
+              <span>LIFECYCLE</span>
+            </div>
+            <div className="overflow-hidden whitespace-nowrap w-full">
+              <div className="inline-block animate-marquee text-xs font-mono text-[#E2E8F0]">
+                {bannerNotice}
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+
       {/* Section Header */}
       <div className="p-6 sm:p-8 rounded-2xl bg-[#0D1B2A] border border-white/10 shadow-xl space-y-2">
         <div className="flex items-center space-x-3">
@@ -156,17 +260,21 @@ export const HistoryQuestions: React.FC = () => {
           <div>
             <h2 className="text-2xl font-bold text-[#F8FAFC]">History Questions</h2>
             <p className="text-xs sm:text-sm text-[#CBD5E1]">
-              Previously published Placement Questions and their answers.
+              Previously published Placement Questions and their complete answers archive.
             </p>
           </div>
         </div>
       </div>
 
       {/* Archive Cards List */}
-      {HISTORY_PLACEMENT_SETS.length === 0 ? (
+      {loading ? (
+        <div className="py-12">
+          <LoadingState label="Loading history questions from database..." />
+        </div>
+      ) : historySets.length === 0 ? (
         <EmptyState
-          title="No Previous Questions Yet"
-          description="Previously published Placement Questions will appear here."
+          title="No history questions available."
+          description="Previously published Placement Questions will appear here once archived."
           icon={<HelpCircle className="w-6 h-6 text-[#94A3B8]" />}
           className="py-12"
         />
@@ -190,24 +298,38 @@ export const HistoryQuestions: React.FC = () => {
 
                 <p className="text-xs text-[#CBD5E1] font-medium">{set.title}</p>
 
-                <div className="flex items-center space-x-4 text-xs text-[#94A3B8] font-mono pt-1">
+                <div className="flex flex-wrap items-center gap-3 text-xs text-[#94A3B8] font-mono pt-1">
                   <span className="flex items-center space-x-1">
                     <Calendar className="w-3.5 h-3.5 text-[#94A3B8]" />
                     <span>Published: {set.completedDate}</span>
                   </span>
+                  {(set as any).expiresAt && (
+                    <span>• Expiry: {(set as any).expiresAt}</span>
+                  )}
                   <span>• {set.questions.length} Questions</span>
                 </div>
               </div>
 
-              <Button
-                onClick={() => setSelectedSet(set)}
-                variant="primary"
-                size="md"
-                leftIcon={<Eye className="w-4 h-4" />}
-                className="self-start sm:self-center"
-              >
-                View Questions
-              </Button>
+              <div className="flex items-center gap-2 self-start sm:self-center">
+                <Button
+                  onClick={() => handleDownloadPDF(set)}
+                  disabled={downloadingId === set.id}
+                  variant="outline"
+                  size="md"
+                  leftIcon={<Download className="w-4 h-4" />}
+                  className="text-[#22D3EE] border-[#22D3EE]/30 hover:bg-[#22D3EE]/10"
+                >
+                  {downloadingId === set.id ? "PDF..." : "Download PDF"}
+                </Button>
+                <Button
+                  onClick={() => setSelectedSet(set)}
+                  variant="primary"
+                  size="md"
+                  leftIcon={<Eye className="w-4 h-4" />}
+                >
+                  View Questions
+                </Button>
+              </div>
             </div>
           ))}
 

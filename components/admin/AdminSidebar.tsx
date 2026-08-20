@@ -47,12 +47,11 @@ export const AdminSidebar: React.FC<AdminSidebarProps> = ({
       {/* Brand Header */}
       <div className="flex items-center justify-between pb-6 mb-4 border-b border-white/10">
         <Link href="/admin/dashboard" className="flex items-center gap-3 group">
-          <div className="grid grid-cols-2 gap-0.5 w-6 h-6 p-0.5 rounded bg-white/5 border border-white/10 group-hover:border-[#0078D4]/50 transition-colors">
-            <span className="bg-[#F25022] rounded-[1px]" />
-            <span className="bg-[#7FBA00] rounded-[1px]" />
-            <span className="bg-[#00A4EF] rounded-[1px]" />
-            <span className="bg-[#FFB900] rounded-[1px]" />
-          </div>
+          <img
+            src="/images/mcc-logo.jpeg"
+            alt="MCC Logo"
+            className="h-8 w-auto object-contain rounded-lg"
+          />
           <div className="flex flex-col">
             <span className="font-bold text-base tracking-tight text-[#F8FAFC]">
               MCC ADMIN

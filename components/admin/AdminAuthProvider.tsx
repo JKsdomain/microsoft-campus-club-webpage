@@ -37,6 +37,7 @@ interface AdminAuthContextType {
   proposals: Proposal[];
   approveProposal: (id: string) => void;
   rejectProposal: (id: string) => void;
+  archiveProposal: (id: string) => Promise<void>;
 
   announcements: Announcement[];
   addAnnouncement: (text: string, payload?: { title?: string; poster?: any; isPinned?: boolean; status?: string }) => void;
@@ -167,6 +168,21 @@ export const AdminAuthProvider: React.FC<{ children: React.ReactNode }> = ({ chi
       }
     };
 
+    // Load audit logs from MongoDB
+    const fetchAuditLogs = async () => {
+      try {
+        const logRes = await fetch("/api/admin/audit-logs");
+        if (logRes.ok) {
+          const logData = await logRes.json();
+          if (Array.isArray(logData.auditLogs)) {
+            setAuditLogs(logData.auditLogs);
+          }
+        }
+      } catch (e) {
+        console.error("Failed to fetch audit logs from MongoDB", e);
+      }
+    };
+
     // Call async functions
     syncWithServer();
     fetchUsersFromDb();
@@ -174,6 +190,7 @@ export const AdminAuthProvider: React.FC<{ children: React.ReactNode }> = ({ chi
     fetchAvailability();
     fetchAssignments();
     fetchProposals();
+    fetchAuditLogs();
   }, []);
 
   const saveAnnouncements = async (newAnnouncements: Announcement[]) => {
@@ -411,6 +428,35 @@ export const AdminAuthProvider: React.FC<{ children: React.ReactNode }> = ({ chi
     }
   };
 
+  const archiveProposal = async (id: string) => {
+    const target = proposals.find((p) => p.id === id);
+    try {
+      const res = await fetch("/api/admin/proposals", {
+        method: "PUT",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ id, action: "archive" }),
+      });
+      if (res.ok) {
+        try {
+          const propRes = await fetch("/api/admin/proposals");
+          if (propRes.ok) {
+            const propData = await propRes.json();
+            if (Array.isArray(propData.proposals)) {
+              setProposals(propData.proposals);
+            }
+          }
+        } catch {
+          setProposals((prev) =>
+            prev.map((p) => (p.id === id ? { ...p, status: "Archived" } : p))
+          );
+        }
+        addAuditLog(`Archived Activity (${target?.title})`, "Approval Workflow", "Success");
+      }
+    } catch (err) {
+      console.error("❌ Archive proposal network error:", err);
+    }
+  };
+
   // Announcement Management
   const addAnnouncement = async (
     text: string,
@@ -566,15 +612,32 @@ export const AdminAuthProvider: React.FC<{ children: React.ReactNode }> = ({ chi
 
   const publishedAnnouncement = announcements.find((a) => a.published) || null;
 
-  // Excel / CSV Export
+  // Excel / CSV Export with Original & Modified Values
   const exportAuditLogsToCSV = () => {
-    const headers = ["Timestamp", "Actor", "Role", "Action", "Module", "Status"];
+    const headers = [
+      "Timestamp",
+      "Actor",
+      "Role",
+      "Action",
+      "Module",
+      "Target ID",
+      "Target Type",
+      "Original Value",
+      "Modified Value",
+      "Reason",
+      "Status",
+    ];
     const rows = auditLogs.map((log) => [
       `"${log.timestamp}"`,
       `"${log.actor}"`,
       `"${log.role}"`,
       `"${log.action}"`,
       `"${log.module}"`,
+      `"${log.targetId || ""}"`,
+      `"${log.targetType || ""}"`,
+      `"${log.originalValue ? JSON.stringify(log.originalValue).replace(/"/g, '""') : ""}"`,
+      `"${log.modifiedValue ? JSON.stringify(log.modifiedValue).replace(/"/g, '""') : ""}"`,
+      `"${(log.reason || "").replace(/"/g, '""')}"`,
       `"${log.status}"`,
     ]);
 
@@ -646,6 +709,7 @@ export const AdminAuthProvider: React.FC<{ children: React.ReactNode }> = ({ chi
         proposals,
         approveProposal,
         rejectProposal,
+        archiveProposal,
         announcements,
         addAnnouncement,
         updateAnnouncement,

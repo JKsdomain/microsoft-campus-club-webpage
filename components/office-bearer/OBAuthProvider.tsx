@@ -24,6 +24,7 @@ interface OBAuthContextType {
 
   feedPosts: FeedPostItem[];
   submitFeedPost: (content: string, mediaType?: "none" | "image" | "video", mediaUrl?: string, mediaPublicId?: string) => Promise<void>;
+  deleteFeedPost: (postId: string) => Promise<boolean>;
   toggleFeedVote: (postId: string, vote: "like" | "dislike") => void;
   publishedFeedPosts: FeedPostItem[];
 
@@ -175,7 +176,11 @@ export const OBAuthProvider: React.FC<{ children: React.ReactNode }> = ({ childr
   const hasResponsibility = (
     activityName: "Placement Questions" | "General Quiz" | "Technical Games" | "Feed Community"
   ): boolean => {
-    // STRICT RULE: EXACTLY ONE RESPONSIBILITY
+    // Technical Games is no longer restricted to 1:1 assignment
+    if (activityName === "Technical Games") {
+      return true;
+    }
+    // STRICT RULE: EXACTLY ONE RESPONSIBILITY for Quiz, Placement, Feed
     return currentOb.assignedResponsibility === activityName;
   };
 
@@ -408,6 +413,27 @@ export const OBAuthProvider: React.FC<{ children: React.ReactNode }> = ({ childr
     }
   };
 
+  const deleteFeedPost = async (postId: string): Promise<boolean> => {
+    try {
+      const res = await fetch(`/api/office-bearer/feed/${postId}`, {
+        method: "DELETE",
+      });
+      if (res.ok) {
+        setFeedPosts((prev) => prev.filter((p) => p.id !== postId && p.parentId !== postId));
+        await fetchProposalsData();
+        return true;
+      } else {
+        const err = await res.json().catch(() => ({}));
+        alert(err.message || "Failed to delete feed post.");
+        return false;
+      }
+    } catch (e) {
+      console.error("Failed to delete feed post:", e);
+      alert("Network error while deleting feed post.");
+      return false;
+    }
+  };
+
   const refreshProposals = fetchProposalsData;
 
   const publishedFeedPosts = feedPosts.filter((p) => p.status === "Approved");
@@ -426,6 +452,7 @@ export const OBAuthProvider: React.FC<{ children: React.ReactNode }> = ({ childr
         submitQuizProposal,
         feedPosts,
         submitFeedPost,
+        deleteFeedPost,
         toggleFeedVote,
         publishedFeedPosts,
         submitRevision,

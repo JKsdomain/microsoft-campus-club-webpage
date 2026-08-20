@@ -232,46 +232,43 @@ export const PlacementTestRunner: React.FC<PlacementTestRunnerProps> = ({
     setUserAnswers((prev) => ({ ...prev, [questionId]: option }));
   };
 
-  // Download Detailed Placement Report File
-  const handleDownloadReport = () => {
+  const [isDownloadingPDF, setIsDownloadingPDF] = useState(false);
+
+  // Download Detailed Placement Report PDF
+  const handleDownloadReport = async () => {
     if (!report) return;
+    setIsDownloadingPDF(true);
+    try {
+      const res = await fetch("/api/students-corner/download-result-pdf", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          attemptId: report.attemptId,
+          email: report.email,
+          report,
+        }),
+      });
 
-    let content = `====================================================\n`;
-    content += `         MCC PLACEMENT TEST EVALUATION REPORT       \n`;
-    content += `====================================================\n\n`;
-    content += `Student Name:     ${report.username}\n`;
-    content += `Student Email:    ${report.email}\n`;
-    content += `Department:       ${report.department || effectiveStudentInfo.department}\n`;
-    content += `Year / Section:   Year ${report.year || effectiveStudentInfo.year} - Sec ${report.section || effectiveStudentInfo.section}\n`;
-    content += `Roll Number:      ${report.rollNumber || effectiveStudentInfo.rollNumber}\n`;
-    content += `Assessment:       ${report.testTitle}\n`;
-    content += `Timestamp:        ${report.timestamp}\n`;
-    content += `Security Violations: ${violationsCount}\n`;
-    content += `----------------------------------------------------\n`;
-    content += `Score: ${report.score} / ${report.totalQuestions * 25} (${report.percentage}%)\n`;
-    content += `Correct Answers: ${report.correctAnswersCount}\n`;
-    content += `Incorrect Answers: ${report.incorrectAnswersCount}\n`;
-    content += `====================================================\n\n`;
-    content += `QUESTION-BY-QUESTION BREAKDOWN:\n\n`;
-
-    report.details.forEach((item, i) => {
-      content += `Q${i + 1}: ${item.questionText}\n`;
-      content += `  Your Answer:    ${item.userAnswer}\n`;
-      content += `  Correct Answer: ${item.correctAnswer}\n`;
-      content += `  Result:         ${item.isCorrect ? "CORRECT [PASS]" : "INCORRECT [FAIL]"}\n`;
-      content += `  Explanation:    ${item.explanation}\n\n`;
-    });
-
-    content += `====================================================\n`;
-    content += `Issued by Microsoft Campus Club (MCC) Assessment Engine\n`;
-
-    const blob = new Blob([content], { type: "text/plain;charset=utf-8" });
-    const url = URL.createObjectURL(blob);
-    const link = document.createElement("a");
-    link.href = url;
-    link.download = `MCC_Placement_Report_${report.username.replace(/ /g, "_")}.txt`;
-    link.click();
-    URL.revokeObjectURL(url);
+      if (res.ok) {
+        const blob = await res.blob();
+        const url = URL.createObjectURL(blob);
+        const link = document.createElement("a");
+        link.href = url;
+        const safeStudent = (report.username || "student").toLowerCase().replace(/[^a-z0-9]+/g, "-");
+        link.download = `mcc-placement-result-${safeStudent}.pdf`;
+        document.body.appendChild(link);
+        link.click();
+        link.remove();
+        URL.revokeObjectURL(url);
+      } else {
+        alert("Failed to download placement result PDF.");
+      }
+    } catch (e) {
+      console.error("Result PDF error:", e);
+      alert("Network error while downloading result PDF.");
+    } finally {
+      setIsDownloadingPDF(false);
+    }
   };
 
   const minutes = Math.floor(timeLeftSeconds / 60);
@@ -302,11 +299,12 @@ export const PlacementTestRunner: React.FC<PlacementTestRunnerProps> = ({
 
             <Button
               onClick={handleDownloadReport}
+              disabled={isDownloadingPDF}
               variant="primary"
               size="md"
               leftIcon={<Download className="w-4 h-4" />}
             >
-              Download Report
+              {isDownloadingPDF ? "Generating PDF..." : "Download Result PDF"}
             </Button>
           </div>
 

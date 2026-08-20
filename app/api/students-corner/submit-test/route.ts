@@ -1,6 +1,6 @@
 import { NextResponse } from "next/server";
 import { dbConnect } from "@/lib/db/dbConnect";
-import { SystemSetting, ProposalModel, TestAttempt } from "@/lib/db/models";
+import { SystemSetting, ProposalModel, TestAttempt, AuditLog } from "@/lib/db/models";
 import { ACTIVE_PLACEMENT_SET, ACTIVE_QUIZ_SET, StudentInfo, StudentResultReport } from "@/lib/studentState";
 import mongoose from "mongoose";
 
@@ -48,15 +48,16 @@ export async function POST(req: Request) {
       );
     }
 
-    // Email format validation & normalization
-    const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
-    if (!emailRegex.test(studentInfo.email)) {
+    // Email format & domain validation & normalization (@mepcoeng.ac.in)
+    const studentEmailNormalized = studentInfo.email.trim().toLowerCase();
+    const collegeDomain = "@mepcoeng.ac.in";
+    const emailParts = studentEmailNormalized.split("@");
+    if (emailParts.length !== 2 || !emailParts[0] || `@${emailParts[1]}` !== collegeDomain) {
       return NextResponse.json(
-        { message: "Please provide a valid email address." },
+        { message: "Please use your Mepco college email address ending with @mepcoeng.ac.in." },
         { status: 400 }
       );
     }
-    const studentEmailNormalized = studentInfo.email.toLowerCase();
 
     const now = new Date();
 
@@ -68,21 +69,11 @@ export async function POST(req: Request) {
       isActive: true,
     }).sort({ submittedAt: -1 });
 
-    if (!activeProposal) {
-      return NextResponse.json(
-        {
-          allowed: false,
-          status: "CLOSED",
-          message: `Assessment submission rejected: "${testType}" is not currently published.`,
-        },
-        { status: 403 }
-      );
-    }
+    const logicalActivityId = activeProposal
+      ? String(activeProposal.parentId || activeProposal._id)
+      : (testType === "Placement Questions" ? "default-placement" : "default-general-quiz");
 
-    // Logical root activity ID across revisions
-    const logicalActivityId = activeProposal.parentId || activeProposal._id;
-
-    if (activeProposal.startAt && activeProposal.endAt) {
+    if (activeProposal && activeProposal.startAt && activeProposal.endAt) {
       const startAt = new Date(activeProposal.startAt);
       const endAt = new Date(activeProposal.endAt);
 
@@ -120,7 +111,17 @@ export async function POST(req: Request) {
     };
 
     const currentStatus = availabilityMap[testType] || "OPEN";
-    if (currentStatus !== "OPEN") {
+    if (currentStatus === "CLOSED") {
+      return NextResponse.json(
+        {
+          allowed: false,
+          status: "CLOSED",
+          message: `Assessment submission rejected: "${testType}" is currently closed.`,
+        },
+        { status: 403 }
+      );
+    }
+    if (currentStatus === "COMING SOON" || currentStatus === "UPCOMING") {
       return NextResponse.json(
         {
           allowed: false,
@@ -143,15 +144,29 @@ export async function POST(req: Request) {
         {
           allowed: false,
           code: "ALREADY_ATTEMPTED",
-          message: "You have already attempted this activity.",
+          message: "You have already attempted this activity. Only one attempt is allowed per student.",
         },
         { status: 409 }
       );
     }
 
     // 4. Server-Side Score Calculation & Immutable Question Snapshot Construction
-    const questionList = testType === "Placement Questions" ? ACTIVE_PLACEMENT_SET.questions : ACTIVE_QUIZ_SET.questions;
-    const testTitle = testType === "Placement Questions" ? ACTIVE_PLACEMENT_SET.title : ACTIVE_QUIZ_SET.title;
+    let questionList = testType === "Placement Questions" ? ACTIVE_PLACEMENT_SET.questions : ACTIVE_QUIZ_SET.questions;
+    let testTitle = testType === "Placement Questions" ? ACTIVE_PLACEMENT_SET.title : ACTIVE_QUIZ_SET.title;
+
+    if (activeProposal) {
+      if (activeProposal.title) testTitle = activeProposal.title;
+      if (activeProposal.details) {
+        try {
+          const parsed = JSON.parse(activeProposal.details);
+          if (Array.isArray(parsed) && parsed.length > 0 && parsed[0].correctAnswer) {
+            questionList = parsed;
+          }
+        } catch {
+          // keep fallback questionList
+        }
+      }
+    }
 
     let correctCount = 0;
     const answersMap = userAnswers || {};
@@ -167,7 +182,7 @@ export async function POST(req: Request) {
         selectedAnswer: selected,
         correctAnswer: q.correctAnswer,
         isCorrect,
-        explanation: q.explanation,
+        explanation: q.explanation || "",
       };
     });
 
@@ -262,6 +277,39 @@ export async function POST(req: Request) {
         explanation: item.explanation,
       })),
     };
+
+    // 7. Record Audit Log Entry for test submission
+    try {
+      await AuditLog.create({
+        actorType: "STUDENT",
+        actorName: studentInfo.name,
+        actorEmail: studentEmailNormalized,
+        role: "Student",
+        action: "STUDENT_TEST_SUBMITTED",
+        module: testType,
+        targetId: createdAttemptId && mongoose.Types.ObjectId.isValid(createdAttemptId) ? new mongoose.Types.ObjectId(createdAttemptId) : null,
+        targetType: "TEST_ATTEMPT",
+        originalValue: null,
+        modifiedValue: {
+          score,
+          percentage,
+          totalQuestions,
+          correctAnswers: correctCount,
+          wrongAnswers: wrongCount,
+          department: studentInfo.department,
+          rollNumber: studentInfo.rollNumber,
+        },
+        metadata: {
+          studentName: studentInfo.name,
+          studentEmail: studentEmailNormalized,
+          testType,
+          score,
+          percentage,
+        },
+      });
+    } catch (auditErr) {
+      console.warn("Audit log creation warning in submit-test:", auditErr);
+    }
 
     return NextResponse.json({
       success: true,

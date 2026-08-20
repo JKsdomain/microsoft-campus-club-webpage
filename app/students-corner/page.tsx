@@ -1,7 +1,8 @@
 "use client";
 
-import React, { useState } from "react";
+import React, { useState, useEffect, Suspense } from "react";
 import Link from "next/link";
+import { useSearchParams } from "next/navigation";
 import {
   BriefcaseBusiness,
   CircleHelp,
@@ -42,8 +43,28 @@ type TabType =
 
 function StudentsCornerInner() {
   const { publishedFeedPosts } = useOBAuth();
+  const searchParams = useSearchParams();
 
   const [activeTab, setActiveTab] = useState<TabType>("overview");
+
+  useEffect(() => {
+    const tabParam = searchParams.get("tab") as TabType | null;
+    if (
+      tabParam &&
+      [
+        "overview",
+        "placement-questions",
+        "general-quiz",
+        "technical-games",
+        "feed",
+        "history",
+        "leaderboard",
+        "membership",
+      ].includes(tabParam)
+    ) {
+      setActiveTab(tabParam);
+    }
+  }, [searchParams]);
 
   // Student Info Modal State
   const [studentInfoModalOpen, setStudentInfoModalOpen] = useState(false);
@@ -171,7 +192,7 @@ function StudentsCornerInner() {
     { id: "technical-games", label: "Technical Games", icon: Gamepad2 },
     { id: "feed", label: "Feed", icon: Rss },
     { id: "history", label: "History Questions", icon: History },
-    { id: "leaderboard", label: "Weekly Leaderboard", icon: Trophy },
+    { id: "leaderboard", label: "Placement Leaderboard", icon: Trophy },
     { id: "membership", label: "Membership Form", icon: FileText },
   ];
 
@@ -180,12 +201,11 @@ function StudentsCornerInner() {
       {/* Platform Header */}
       <header className="sticky top-0 z-30 bg-[#07111F]/90 backdrop-blur-md border-b border-white/10 px-4 sm:px-8 py-4 flex items-center justify-between">
         <Link href="/" className="flex items-center space-x-3 group">
-          <div className="grid grid-cols-2 gap-0.5 w-7 h-7 p-1 rounded bg-white/5 border border-white/10 group-hover:border-[#0078D4]/50 transition-colors">
-            <span className="bg-[#00A4EF] rounded-[1px]" />
-            <span className="bg-[#7FBA00] rounded-[1px]" />
-            <span className="bg-[#F25022] rounded-[1px]" />
-            <span className="bg-[#FFB900] rounded-[1px]" />
-          </div>
+          <img
+            src="/images/mcc-logo.jpeg"
+            alt="MCC Logo"
+            className="h-9 w-auto object-contain rounded-lg"
+          />
           <div className="flex flex-col">
             <span className="font-bold text-lg tracking-tight text-[#F8FAFC]">
               MCC STUDENTS CORNER
@@ -836,7 +856,9 @@ function StudentsCornerInner() {
 export default function StudentsCornerPage() {
   return (
     <OBAuthProvider>
-      <StudentsCornerInner />
+      <Suspense fallback={null}>
+        <StudentsCornerInner />
+      </Suspense>
     </OBAuthProvider>
   );
 }

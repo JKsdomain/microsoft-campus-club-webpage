@@ -26,13 +26,12 @@ export const LoginImagePanel: React.FC<LoginImagePanelProps> = ({ role }) => {
 
       {/* Top Bar / Status */}
       <div className="relative z-10 flex items-center justify-between">
-        <div className="flex items-center space-x-2">
-          <div className="grid grid-cols-2 gap-0.5 w-5 h-5 p-0.5 rounded bg-white/10 border border-white/10">
-            <span className="bg-[#F25022] rounded-[1px]" />
-            <span className="bg-[#7FBA00] rounded-[1px]" />
-            <span className="bg-[#00A4EF] rounded-[1px]" />
-            <span className="bg-[#FFB900] rounded-[1px]" />
-          </div>
+        <div className="flex items-center space-x-2.5">
+          <img
+            src="/images/mcc-logo.jpeg"
+            alt="MCC Logo"
+            className="h-7 w-auto object-contain rounded-md"
+          />
           <span className="text-xs font-bold tracking-wider text-white">MCC</span>
         </div>
 

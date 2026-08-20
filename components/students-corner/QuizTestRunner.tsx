@@ -8,7 +8,7 @@ import {
   getPublicQuizQuestions,
   evaluateQuizSubmission,
 } from "@/lib/studentState";
-import { Clock, CheckCircle2, XCircle, ArrowRight, ArrowLeft } from "lucide-react";
+import { Clock, CheckCircle2, XCircle, ArrowRight, ArrowLeft, Download } from "lucide-react";
 import { Button } from "../ui/Button";
 
 interface QuizTestRunnerProps {
@@ -35,36 +35,21 @@ export const QuizTestRunner: React.FC<QuizTestRunnerProps> = ({
 
   const [currentIdx, setCurrentIdx] = useState(0);
   const [userAnswers, setUserAnswers] = useState<Record<string, string>>({});
-  const [timeLeftSeconds, setTimeLeftSeconds] = useState(
-    ACTIVE_QUIZ_SET.timerMinutes * 60
-  );
+  const totalDuration = ACTIVE_QUIZ_SET.timerMinutes * 60;
+  const [timeLeftSeconds, setTimeLeftSeconds] = useState(totalDuration);
   const [report, setReport] = useState<StudentResultReport | null>(null);
 
-  const publicQuestions = getPublicQuizQuestions();
+  // Stabilize questions array so ordering and choices never regenerate on re-renders
+  const [questions] = useState(() => getPublicQuizQuestions());
 
-  useEffect(() => {
-    if (report) return;
+  // Timestamp-based elapsed timer to maintain accurate countdown across tab/window switches
+  const startTimeRef = React.useRef<number>(Date.now());
+  const submittedRef = React.useRef(false);
 
-    const timer = setInterval(() => {
-      setTimeLeftSeconds((prev) => {
-        if (prev <= 1) {
-          clearInterval(timer);
-          handleSubmitQuiz();
-          return 0;
-        }
-        return prev - 1;
-      });
-    }, 1000);
+  const handleSubmitQuiz = React.useCallback(async () => {
+    if (submittedRef.current) return;
+    submittedRef.current = true;
 
-    return () => clearInterval(timer);
-  }, [report]);
-
-  const handleSelectAnswer = (questionId: string, option: string) => {
-    if (report) return;
-    setUserAnswers((prev) => ({ ...prev, [questionId]: option }));
-  };
-
-  const handleSubmitQuiz = async () => {
     try {
       const res = await fetch("/api/students-corner/submit-test", {
         method: "POST",
@@ -92,12 +77,83 @@ export const QuizTestRunner: React.FC<QuizTestRunnerProps> = ({
       setReport(generatedReport);
       onFinishTest(generatedReport);
     }
+  }, [effectiveStudentInfo, userAnswers, onFinishTest]);
+
+  useEffect(() => {
+    if (report) return;
+
+    const updateTimer = () => {
+      const elapsed = Math.floor((Date.now() - startTimeRef.current) / 1000);
+      const remaining = Math.max(0, totalDuration - elapsed);
+      setTimeLeftSeconds(remaining);
+
+      if (remaining <= 0 && !submittedRef.current) {
+        handleSubmitQuiz();
+      }
+    };
+
+    const timer = setInterval(updateTimer, 1000);
+
+    const handleVisibilityOrFocus = () => {
+      updateTimer();
+    };
+
+    window.addEventListener("focus", handleVisibilityOrFocus);
+    document.addEventListener("visibilitychange", handleVisibilityOrFocus);
+
+    return () => {
+      clearInterval(timer);
+      window.removeEventListener("focus", handleVisibilityOrFocus);
+      document.removeEventListener("visibilitychange", handleVisibilityOrFocus);
+    };
+  }, [report, totalDuration, handleSubmitQuiz]);
+
+  const handleSelectAnswer = (questionId: string, option: string) => {
+    if (report) return;
+    setUserAnswers((prev) => ({ ...prev, [questionId]: option }));
   };
 
   const minutes = Math.floor(timeLeftSeconds / 60);
   const seconds = timeLeftSeconds % 60;
-  const questions = publicQuestions;
   const currentQ = questions[currentIdx];
+
+  const [isDownloadingPDF, setIsDownloadingPDF] = useState(false);
+
+  const handleDownloadResultPDF = async () => {
+    if (!report) return;
+    setIsDownloadingPDF(true);
+    try {
+      const res = await fetch("/api/students-corner/download-result-pdf", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          attemptId: report.attemptId,
+          email: report.email,
+          report,
+        }),
+      });
+
+      if (res.ok) {
+        const blob = await res.blob();
+        const url = window.URL.createObjectURL(blob);
+        const a = document.createElement("a");
+        a.href = url;
+        const safeName = (report.username || "student").toLowerCase().replace(/[^a-z0-9]+/g, "-");
+        a.download = `mcc-general-quiz-result-${safeName}.pdf`;
+        document.body.appendChild(a);
+        a.click();
+        a.remove();
+        window.URL.revokeObjectURL(url);
+      } else {
+        alert("Failed to download quiz result PDF.");
+      }
+    } catch (e) {
+      console.error("Result PDF error:", e);
+      alert("Network error while downloading result PDF.");
+    } finally {
+      setIsDownloadingPDF(false);
+    }
+  };
 
   if (report) {
     return (
@@ -130,6 +186,19 @@ export const QuizTestRunner: React.FC<QuizTestRunnerProps> = ({
               <span className="text-[10px] font-mono text-[#94A3B8] block">Incorrect</span>
               <span className="text-2xl font-bold text-red-400">{report.incorrectAnswersCount}</span>
             </div>
+          </div>
+
+          <div className="pt-2 flex justify-center">
+            <Button
+              onClick={handleDownloadResultPDF}
+              disabled={isDownloadingPDF}
+              variant="primary"
+              size="md"
+              leftIcon={<Download className="w-4 h-4" />}
+              className="bg-[#0078D4] hover:bg-[#0078D4]/80"
+            >
+              {isDownloadingPDF ? "Generating PDF..." : "Download Result PDF"}
+            </Button>
           </div>
         </div>
 

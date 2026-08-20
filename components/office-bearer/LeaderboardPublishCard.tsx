@@ -1,7 +1,7 @@
 "use client";
 
 import React, { useState, useEffect } from "react";
-import { Trophy, CheckCircle2, ShieldAlert, Globe, Lock, RefreshCw } from "lucide-react";
+import { Trophy, CheckCircle2, ShieldAlert, Globe, Lock, RefreshCw, Download, FileSpreadsheet } from "lucide-react";
 import { Button } from "../ui/Button";
 
 interface LeaderboardPublishCardProps {
@@ -22,6 +22,7 @@ export const LeaderboardPublishCard: React.FC<LeaderboardPublishCardProps> = ({
   const [weekNumber, setWeekNumber] = useState<number>(1);
   const [loading, setLoading] = useState<boolean>(true);
   const [actionLoading, setActionLoading] = useState<boolean>(false);
+  const [downloadingExcel, setDownloadingExcel] = useState<boolean>(false);
   const [errorMsg, setErrorMsg] = useState<string | null>(null);
 
   const fetchStatus = async () => {
@@ -58,7 +59,7 @@ export const LeaderboardPublishCard: React.FC<LeaderboardPublishCardProps> = ({
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
           action: newAction,
-          activityType: activityType || assignedResponsibility,
+          activityType: "Placement Questions",
         }),
       });
 
@@ -78,9 +79,34 @@ export const LeaderboardPublishCard: React.FC<LeaderboardPublishCardProps> = ({
     }
   };
 
+  const handleDownloadExcel = async () => {
+    setDownloadingExcel(true);
+    setErrorMsg(null);
+    try {
+      const res = await fetch("/api/leaderboard/export");
+      if (!res.ok) {
+        const errData = await res.json().catch(() => ({}));
+        throw new Error(errData.message || "Failed to download Excel report.");
+      }
+
+      const blob = await res.blob();
+      const url = window.URL.createObjectURL(blob);
+      const a = document.createElement("a");
+      a.href = url;
+      a.download = `MCC_Placement_Leaderboard_Week_${weekNumber}.xlsx`;
+      document.body.appendChild(a);
+      a.click();
+      window.URL.revokeObjectURL(url);
+      document.body.removeChild(a);
+    } catch (err: any) {
+      setErrorMsg(err.message || "Error downloading Excel file.");
+    } finally {
+      setDownloadingExcel(false);
+    }
+  };
+
   const isObAuthorized =
     role === "ADMIN" ||
-    assignedResponsibility === "General Quiz" ||
     assignedResponsibility === "Placement Questions";
 
   return (
@@ -92,10 +118,10 @@ export const LeaderboardPublishCard: React.FC<LeaderboardPublishCardProps> = ({
           </div>
           <div>
             <h3 className="text-base font-bold text-[#F8FAFC]">
-              Leaderboard Publication Control
+              Placement Leaderboard Publication Control
             </h3>
             <p className="text-xs text-[#94A3B8]">
-              Manage public visibility of official student assessment rankings in Students Corner.
+              Manage public visibility and download official Placement Question assessment rankings.
             </p>
           </div>
         </div>
@@ -127,7 +153,7 @@ export const LeaderboardPublishCard: React.FC<LeaderboardPublishCardProps> = ({
           <div className="text-[#CBD5E1]">
             Status:{" "}
             {isPublished ? (
-              <span className="text-emerald-400 font-semibold">Publicly visible to students</span>
+              <span className="text-emerald-400 font-semibold">Publicly visible to students in Students Corner</span>
             ) : (
               <span className="text-amber-400 font-semibold">Hidden from students</span>
             )}
@@ -135,7 +161,7 @@ export const LeaderboardPublishCard: React.FC<LeaderboardPublishCardProps> = ({
           {isPublished && publishedBy && (
             <div className="text-[11px] font-mono text-[#94A3B8]">
               Published by <strong className="text-[#F8FAFC]">{publishedBy}</strong> (
-              {publishedByRole === "ADMIN" ? "Administrator" : "Office Bearer"})
+              {publishedByRole === "ADMIN" ? "Administrator" : "Placement Lead"})
               {publishedAt && ` • ${new Date(publishedAt).toLocaleString()}`}
             </div>
           )}
@@ -146,7 +172,27 @@ export const LeaderboardPublishCard: React.FC<LeaderboardPublishCardProps> = ({
           )}
         </div>
 
-        <div>
+        <div className="flex items-center gap-2.5 flex-wrap">
+          {/* Excel Download Button */}
+          {isObAuthorized && (
+            <Button
+              variant="outline"
+              size="sm"
+              disabled={downloadingExcel || loading}
+              onClick={handleDownloadExcel}
+              leftIcon={
+                downloadingExcel ? (
+                  <RefreshCw className="w-4 h-4 animate-spin text-[#0078D4]" />
+                ) : (
+                  <FileSpreadsheet className="w-4 h-4 text-emerald-400" />
+                )
+              }
+            >
+              {downloadingExcel ? "Generating .xlsx..." : "Download Excel (.xlsx)"}
+            </Button>
+          )}
+
+          {/* Publish / Unpublish Toggle Button */}
           {isObAuthorized ? (
             <Button
               variant="primary"
@@ -176,7 +222,7 @@ export const LeaderboardPublishCard: React.FC<LeaderboardPublishCardProps> = ({
             </Button>
           ) : (
             <span className="text-xs text-[#94A3B8] italic">
-              Publishing is restricted to Admin & assigned OBs.
+              Publishing is restricted to Admin & Placement Questions OB.
             </span>
           )}
         </div>
@@ -184,3 +230,4 @@ export const LeaderboardPublishCard: React.FC<LeaderboardPublishCardProps> = ({
     </div>
   );
 };
+

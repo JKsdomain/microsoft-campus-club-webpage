@@ -2,17 +2,33 @@
 
 import React, { useState } from "react";
 import { FeedPostItem } from "@/lib/obState";
-import { UserCheck, ShieldCheck, ThumbsUp, ThumbsDown, Maximize2, X, Play, AlertCircle } from "lucide-react";
+import { UserCheck, ShieldCheck, ThumbsUp, ThumbsDown, Maximize2, X, Play, AlertCircle, Trash2 } from "lucide-react";
 import { useOBAuth } from "./OBAuthProvider";
 import { Button } from "../ui/Button";
 
 export const FeedCard: React.FC<{ post: FeedPostItem }> = ({ post }) => {
-  const { toggleFeedVote } = useOBAuth();
+  const { currentOb, isAuthenticated, toggleFeedVote, deleteFeedPost } = useOBAuth();
   const [imageModalOpen, setImageModalOpen] = useState(false);
   const [videoError, setVideoError] = useState(false);
+  const [confirmDeleteOpen, setConfirmDeleteOpen] = useState(false);
+  const [isDeleting, setIsDeleting] = useState(false);
 
   const isLiked = post.userVote === "like";
   const isDisliked = post.userVote === "dislike";
+
+  const canDelete =
+    isAuthenticated &&
+    (currentOb.name === post.authorName ||
+      currentOb.assignedResponsibility === "Feed Community");
+
+  const handleDelete = async () => {
+    setIsDeleting(true);
+    const success = await deleteFeedPost(post.id);
+    setIsDeleting(false);
+    if (success) {
+      setConfirmDeleteOpen(false);
+    }
+  };
 
   return (
     <div className="p-6 rounded-2xl bg-[#0D1B2A] border border-white/10 shadow-xl shadow-black/20 space-y-4 hover:border-white/20 transition-all">
@@ -40,6 +56,15 @@ export const FeedCard: React.FC<{ post: FeedPostItem }> = ({ post }) => {
 
         <div className="flex items-center space-x-2 text-xs text-[#94A3B8] font-mono">
           <span>{post.timestamp}</span>
+          {canDelete && (
+            <button
+              onClick={() => setConfirmDeleteOpen(true)}
+              className="p-1.5 rounded-lg text-red-400/70 hover:text-red-400 hover:bg-red-500/10 transition-colors ml-1"
+              title="Delete post"
+            >
+              <Trash2 className="w-4 h-4" />
+            </button>
+          )}
         </div>
       </div>
 
@@ -142,6 +167,51 @@ export const FeedCard: React.FC<{ post: FeedPostItem }> = ({ post }) => {
           <span>Approved Publication</span>
         </span>
       </div>
+
+      {/* Delete Confirmation Modal */}
+      {confirmDeleteOpen && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/80 backdrop-blur-sm animate-fade-in">
+          <div className="w-full max-w-md rounded-2xl bg-[#0D1B2A] border border-red-500/30 p-6 shadow-2xl space-y-4">
+            <div className="flex items-center space-x-3 text-red-400">
+              <div className="p-2 rounded-xl bg-red-500/10 border border-red-500/20">
+                <Trash2 className="w-6 h-6" />
+              </div>
+              <div>
+                <h3 className="text-lg font-bold text-[#F8FAFC]">Delete this post?</h3>
+                <p className="text-xs text-[#94A3B8]">Confirmation required</p>
+              </div>
+            </div>
+
+            <p className="text-sm text-[#CBD5E1] leading-relaxed">
+              Are you sure you want to remove this feed post? This action cannot be undone.
+            </p>
+
+            <div className="p-3 rounded-xl bg-[#07111F] border border-white/10 text-xs text-[#94A3B8] line-clamp-2 italic font-mono">
+              &quot;{post.content}&quot;
+            </div>
+
+            <div className="pt-2 flex items-center justify-end space-x-3">
+              <Button
+                variant="ghost"
+                size="md"
+                disabled={isDeleting}
+                onClick={() => setConfirmDeleteOpen(false)}
+              >
+                Cancel
+              </Button>
+              <Button
+                variant="primary"
+                size="md"
+                disabled={isDeleting}
+                onClick={handleDelete}
+                className="bg-red-600 hover:bg-red-700 text-white"
+              >
+                {isDeleting ? "Deleting..." : "Delete"}
+              </Button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 };

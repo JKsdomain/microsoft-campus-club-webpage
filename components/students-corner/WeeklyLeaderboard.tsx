@@ -1,7 +1,7 @@
 "use client";
 
 import React from "react";
-import { Trophy, ShieldAlert, Award, CheckCircle2 } from "lucide-react";
+import { Trophy, ShieldAlert, CheckCircle2 } from "lucide-react";
 
 export interface LeaderboardItem {
   rank: number;
@@ -43,13 +43,13 @@ export const WeeklyLeaderboard: React.FC<WeeklyLeaderboardProps> = ({
         </div>
         <div className="space-y-1">
           <h3 className="text-xl font-bold text-[#F8FAFC]">
-            WEEKLY LEADERBOARD
+            PLACEMENT QUESTIONS LEADERBOARD
           </h3>
           <p className="text-sm font-semibold text-amber-400">
             Leaderboard will be available once it is published.
           </p>
           <p className="text-xs text-[#CBD5E1] pt-1">
-            Results are currently under evaluation. Please check back soon after the official rankings are published by the Administrator or assigned Office Bearer.
+            Results are currently under evaluation. Please check back soon after the official rankings are published by the Administrator or Placement Office Bearer.
           </p>
         </div>
       </div>
@@ -64,14 +64,14 @@ export const WeeklyLeaderboard: React.FC<WeeklyLeaderboardProps> = ({
           <div className="flex items-center space-x-2">
             <Trophy className="w-6 h-6 text-amber-400" />
             <h3 className="text-2xl font-bold text-[#F8FAFC] tracking-tight">
-              Weekly Leaderboard
+              Placement Questions Leaderboard
             </h3>
           </div>
           <p className="text-xs text-[#CBD5E1]">
-            Official MCC Student Performance Rankings • Week {weekNumber}
+            Official MCC Placement Assessment Rankings • Week {weekNumber}
             {publishedBy && (
               <span className="text-[#94A3B8] block mt-0.5">
-                Published by <strong className="text-white">{publishedBy}</strong> ({publishedByRole === "ADMIN" ? "Administrator" : "Office Bearer"})
+                Published by <strong className="text-white">{publishedBy}</strong> ({publishedByRole === "ADMIN" ? "Administrator" : "Placement Lead"})
               </span>
             )}
           </p>
@@ -100,7 +100,7 @@ export const WeeklyLeaderboard: React.FC<WeeklyLeaderboardProps> = ({
               {entries.length === 0 ? (
                 <tr>
                   <td colSpan={5} className="py-8 text-center text-xs text-[#94A3B8] italic">
-                    No student attempts recorded for this round yet.
+                    No placement results available yet.
                   </td>
                 </tr>
               ) : (
@@ -164,4 +164,5 @@ export const WeeklyLeaderboard: React.FC<WeeklyLeaderboardProps> = ({
     </div>
   );
 };
+
 

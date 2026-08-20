@@ -60,9 +60,19 @@ export async function POST(req: Request) {
 
     await AuditLog.create({
       actorType: "ADMIN",
-      action: "Created Announcement with Poster",
+      actorName: "Administrator",
+      role: "Administrator",
+      action: "ANNOUNCEMENT_CREATED",
       module: "Announcements",
       targetId: newDoc._id,
+      targetType: "ANNOUNCEMENT",
+      originalValue: null,
+      modifiedValue: {
+        title: newDoc.title,
+        content: newDoc.content,
+        isPinned: newDoc.isPinned,
+        status: newDoc.status,
+      },
       metadata: { title: newDoc.title, isPinned: newDoc.isPinned, hasPoster: Boolean(newDoc.poster) },
     });
 
@@ -103,6 +113,13 @@ export async function PUT(req: Request) {
       return NextResponse.json({ message: "Announcement not found." }, { status: 404 });
     }
 
+    const originalValue = {
+      title: doc.title,
+      content: doc.content,
+      isPinned: doc.isPinned,
+      status: doc.status,
+    };
+
     // Handle pin status change: unpin others if this announcement becomes pinned
     if (isPinned === true && !doc.isPinned) {
       await Announcement.updateMany({}, { isPinned: false });
@@ -129,6 +146,26 @@ export async function PUT(req: Request) {
     }
 
     await doc.save();
+
+    const modifiedValue = {
+      title: doc.title,
+      content: doc.content,
+      isPinned: doc.isPinned,
+      status: doc.status,
+    };
+
+    await AuditLog.create({
+      actorType: "ADMIN",
+      actorName: "Administrator",
+      role: "Administrator",
+      action: "ANNOUNCEMENT_UPDATED",
+      module: "Announcements",
+      targetId: doc._id,
+      targetType: "ANNOUNCEMENT",
+      originalValue,
+      modifiedValue,
+      metadata: { title: doc.title, isPinned: doc.isPinned },
+    });
 
     const formatted = {
       id: String(doc._id),
@@ -162,7 +199,25 @@ export async function DELETE(req: Request) {
       return NextResponse.json({ message: "ID is required." }, { status: 400 });
     }
 
-    await Announcement.findByIdAndDelete(id);
+    const doc = await Announcement.findByIdAndDelete(id);
+    if (doc) {
+      await AuditLog.create({
+        actorType: "ADMIN",
+        actorName: "Administrator",
+        role: "Administrator",
+        action: "ANNOUNCEMENT_DELETED",
+        module: "Announcements",
+        targetId: id,
+        targetType: "ANNOUNCEMENT",
+        originalValue: {
+          title: doc.title,
+          content: doc.content,
+          isPinned: doc.isPinned,
+          status: doc.status,
+        },
+        modifiedValue: null,
+      });
+    }
 
     console.log(`✅ [MONGODB ATLAS] Deleted Announcement ID: ${id}`);
     return NextResponse.json({ message: "Announcement deleted from database.", id });

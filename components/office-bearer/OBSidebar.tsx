@@ -71,12 +71,11 @@ export const OBSidebar: React.FC<OBSidebarProps> = ({
       {/* Brand Header */}
       <div className="flex items-center justify-between pb-6 mb-4 border-b border-white/10">
         <Link href="/office-bearer/dashboard" className="flex items-center gap-3 group">
-          <div className="grid grid-cols-2 gap-0.5 w-6 h-6 p-0.5 rounded bg-white/5 border border-white/10 group-hover:border-[#0078D4]/50 transition-colors">
-            <span className="bg-[#00A4EF] rounded-[1px]" />
-            <span className="bg-[#7FBA00] rounded-[1px]" />
-            <span className="bg-[#F25022] rounded-[1px]" />
-            <span className="bg-[#FFB900] rounded-[1px]" />
-          </div>
+          <img
+            src="/images/mcc-logo.jpeg"
+            alt="MCC Logo"
+            className="h-8 w-auto object-contain rounded-lg"
+          />
           <div className="flex flex-col">
             <span className="font-bold text-base tracking-tight text-[#F8FAFC]">
               MCC OFFICE BEARER
@@ -172,10 +171,10 @@ export const OBSidebar: React.FC<OBSidebarProps> = ({
           )}
         </div>
 
-        {/* Common Platform Feed Link */}
+        {/* Common Platform Modules */}
         <div className="space-y-1 pt-2 border-t border-white/10">
           <span className="px-3 text-[10px] font-mono uppercase tracking-widest text-[#94A3B8] font-semibold block mb-1.5">
-            COMMUNITY
+            COMMUNITY & ACTIVITIES
           </span>
           <Link
             href="/office-bearer/feed"
@@ -192,6 +191,22 @@ export const OBSidebar: React.FC<OBSidebarProps> = ({
               }`}
             />
             <span>Feed</span>
+          </Link>
+          <Link
+            href="/office-bearer/technical-games"
+            onClick={onCloseMobile}
+            className={`flex items-center gap-3 px-3.5 py-2.5 rounded-xl text-sm font-medium transition-all duration-150 ${
+              pathname === "/office-bearer/technical-games"
+                ? "bg-[#0078D4] text-white shadow-md shadow-[#0078D4]/20"
+                : "text-[#CBD5E1] hover:text-white hover:bg-white/[0.06]"
+            }`}
+          >
+            <Gamepad2
+              className={`w-4 h-4 ${
+                pathname === "/office-bearer/technical-games" ? "text-white" : "text-emerald-400"
+              }`}
+            />
+            <span>Technical Games</span>
           </Link>
         </div>
       </div>

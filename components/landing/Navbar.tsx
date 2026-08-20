@@ -11,6 +11,7 @@ import { ThemeToggle } from "../ui/ThemeToggle";
 const NAV_ITEMS = [
   { label: "Home", href: "/" },
   { label: "Students Corner", href: "/students-corner" },
+  { label: "Technical Games", href: "/students-corner?tab=technical-games" },
   { label: "Announcements", href: "/announcements" },
 ];
 

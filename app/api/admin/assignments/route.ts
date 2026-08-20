@@ -9,8 +9,11 @@ export async function GET() {
   try {
     await dbConnect();
 
-    // Fetch all active responsibilities
-    const responsibilities = await Responsibility.find({ status: "ACTIVE" }).sort({ name: 1 });
+    // Fetch all active 1:1 responsibilities (Placement Questions, General Quiz, Feed Community)
+    const responsibilities = await Responsibility.find({
+      status: "ACTIVE",
+      name: { $ne: "Technical Games" },
+    }).sort({ name: 1 });
 
     // Fetch all OBs that have a responsibilityId set (i.e. currently assigned)
     const assignedObs = await OfficeBearer.find({ responsibilityId: { $ne: null } }).populate("responsibilityId");
@@ -82,20 +85,15 @@ export async function PUT(req: Request) {
       );
     }
 
+    // 2. Find currently assigned OB for this responsibility (to capture original value)
+    const previousAssignedOb = await OfficeBearer.findOne({ responsibilityId: responsibility._id });
+
     // 3. STRICT 1:1 ENFORCEMENT
     // 3a. Clear any OB currently assigned to THIS responsibility
     await OfficeBearer.updateMany(
       { responsibilityId: responsibility._id },
       { $set: { responsibilityId: null } }
     );
-
-    // 3b. The selected OB's old responsibility (if any) is implicitly cleared by the updateMany above
-    //     if they were assigned to this same responsibility, or we clear it explicitly:
-    //     Clear the selected OB's current responsibility (if they had a different one)
-    if (selectedOb.responsibilityId && String(selectedOb.responsibilityId) !== String(responsibility._id)) {
-      // Their old responsibility slot is now freed — no action needed on the Responsibility doc,
-      // just clear the OB's pointer (done in the next step).
-    }
 
     // 4. Assign the selected OB to this responsibility
     selectedOb.responsibilityId = responsibility._id;
@@ -104,16 +102,32 @@ export async function PUT(req: Request) {
     // 5. Write Audit Log
     await AuditLog.create({
       actorType: "ADMIN",
-      action: `Assigned ${selectedOb.name} to strictly manage ${responsibility.name}`,
+      actorName: "Administrator",
+      role: "Administrator",
+      action: "RESPONSIBILITY_ASSIGNED",
       module: "Responsibility Management",
       targetId: responsibility._id,
+      targetType: "RESPONSIBILITY",
+      originalValue: {
+        responsibility: responsibility.name,
+        assignedObId: previousAssignedOb ? String(previousAssignedOb._id) : null,
+        assignedObName: previousAssignedOb ? previousAssignedOb.name : null,
+      },
+      modifiedValue: {
+        responsibility: responsibility.name,
+        assignedObId: String(selectedOb._id),
+        assignedObName: selectedOb.name,
+      },
       metadata: { obId: String(selectedOb._id), obName: selectedOb.name, responsibility: responsibility.name },
     });
 
     console.log(`✅ [MONGODB ATLAS] Assigned OB "${selectedOb.name}" → Responsibility "${responsibility.name}"`);
 
     // 6. Return the updated assignment state (full list, same format as GET)
-    const allResponsibilities = await Responsibility.find({ status: "ACTIVE" }).sort({ name: 1 });
+    const allResponsibilities = await Responsibility.find({
+      status: "ACTIVE",
+      name: { $ne: "Technical Games" },
+    }).sort({ name: 1 });
     const allAssignedObs = await OfficeBearer.find({ responsibilityId: { $ne: null } }).populate("responsibilityId");
     const respToObMap: Record<string, any> = {};
     for (const ob of allAssignedObs) {

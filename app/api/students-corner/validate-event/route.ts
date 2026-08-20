@@ -18,7 +18,24 @@ export async function POST(req: Request) {
 
     const now = new Date();
 
-    // 1. Check timeline and duplicate attempt on active approved proposal for General Quiz & Placement Questions
+    // 1. Email Domain Validation if email is provided
+    let studentEmailNormalized: string | null = null;
+    if (email && typeof email === "string" && email.trim()) {
+      const trimmed = email.trim().toLowerCase();
+      const parts = trimmed.split("@");
+      if (parts.length !== 2 || !parts[0] || `@${parts[1]}` !== "@mepcoeng.ac.in") {
+        return NextResponse.json(
+          {
+            allowed: false,
+            message: "Please use your Mepco college email address ending with @mepcoeng.ac.in.",
+          },
+          { status: 400 }
+        );
+      }
+      studentEmailNormalized = trimmed;
+    }
+
+    // 2. Check timeline and duplicate attempt on active approved proposal for General Quiz & Placement Questions
     if (activityName === "General Quiz" || activityName === "Placement Questions") {
       const dbType = activityName === "General Quiz" ? "GENERAL_QUIZ" : "PLACEMENT_QUESTIONS";
       const activeProposal = await ProposalModel.findOne({
@@ -27,10 +44,11 @@ export async function POST(req: Request) {
         isActive: true,
       }).sort({ submittedAt: -1 });
 
-      if (activeProposal) {
-        // Logical activity ID is the root proposal ID across all revisions
-        const logicalActivityId = activeProposal.parentId || activeProposal._id;
+      const logicalActivityId = activeProposal
+        ? String(activeProposal.parentId || activeProposal._id)
+        : (activityName === "Placement Questions" ? "default-placement" : "default-general-quiz");
 
+      if (activeProposal) {
         // Timeline check
         if (activeProposal.startAt && activeProposal.endAt) {
           const startAt = new Date(activeProposal.startAt);
@@ -62,29 +80,31 @@ export async function POST(req: Request) {
             );
           }
         }
+      }
 
-        // Duplicate attempt check if email is provided
-        if (email && typeof email === "string" && email.trim()) {
-          const studentEmailNormalized = email.trim().toLowerCase();
-          const existingAttempt = await TestAttempt.findOne({
-            studentEmailNormalized,
-            activityId: logicalActivityId,
-            status: { $in: ["COMPLETED", "SUBMITTED"] },
-          });
+      // Duplicate attempt check if email is provided
+      if (studentEmailNormalized) {
+        const existingAttempt = await TestAttempt.findOne({
+          studentEmailNormalized,
+          activityId: logicalActivityId,
+          status: { $in: ["COMPLETED", "SUBMITTED"] },
+        });
 
-          if (existingAttempt) {
-            return NextResponse.json(
-              {
-                allowed: false,
-                code: "ALREADY_ATTEMPTED",
-                message: "You have already attempted this test.",
-                activityId: logicalActivityId,
-              },
-              { status: 409 }
-            );
-          }
+        if (existingAttempt) {
+          return NextResponse.json(
+            {
+              allowed: false,
+              code: "ALREADY_ATTEMPTED",
+              message: "You have already attempted this test. Only one attempt is allowed per student.",
+              activityId: logicalActivityId,
+            },
+            { status: 409 }
+          );
         }
+      }
 
+      // If active proposal exists, return its details
+      if (activeProposal) {
         return NextResponse.json({
           allowed: true,
           status: "OPEN",

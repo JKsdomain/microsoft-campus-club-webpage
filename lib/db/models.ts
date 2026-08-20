@@ -117,6 +117,8 @@ const ProposalSchema = new Schema(
     // Timeline fields (General Quiz & Placement Questions)
     startAt: { type: Date, default: null },
     endAt: { type: Date, default: null },
+    archivedAt: { type: Date, default: null },
+    expiresAt: { type: Date, default: null },
   },
   { timestamps: true }
 );
@@ -416,12 +418,19 @@ const AuditLogSchema = new Schema(
     actorId: { type: String, default: null, index: true },
     actorType: {
       type: String,
-      enum: ["ADMIN", "OFFICE_BEARER", "SYSTEM"],
+      enum: ["ADMIN", "OFFICE_BEARER", "STUDENT", "SYSTEM"],
       required: true,
     },
+    actorName: { type: String, default: null },
+    actorEmail: { type: String, default: null },
+    role: { type: String, default: null },
     action: { type: String, required: true, index: true },
     module: { type: String, required: true, index: true },
-    targetId: { type: Schema.Types.ObjectId, default: null },
+    targetId: { type: Schema.Types.Mixed, default: null },
+    targetType: { type: String, default: null },
+    originalValue: { type: Schema.Types.Mixed, default: null },
+    modifiedValue: { type: Schema.Types.Mixed, default: null },
+    reason: { type: String, default: null },
     metadata: { type: Schema.Types.Mixed, default: {} },
     timestamp: { type: Date, default: Date.now, index: true },
     ipAddress: { type: String, default: null },

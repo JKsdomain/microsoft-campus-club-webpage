@@ -47,6 +47,13 @@ export async function PUT(req: Request) {
       );
     }
 
+    const existingSetting = await SystemSetting.findOne({ key: "activityAvailability" });
+    const originalValue = existingSetting?.value || {
+      "Placement Questions": "OPEN",
+      "General Quiz": "OPEN",
+      "Technical Games": "COMING SOON",
+    };
+
     // Upsert: create if missing, update if exists
     const result = await SystemSetting.findOneAndUpdate(
       { key: "activityAvailability" },
@@ -62,8 +69,12 @@ export async function PUT(req: Request) {
     // Write audit log
     await AuditLog.create({
       actorType: "ADMIN",
-      action: `Updated activity availability: ${JSON.stringify(activityAvailability)}`,
+      actorName: "Administrator",
+      role: "Administrator",
+      action: "ACTIVITY_STATUS_CHANGED",
       module: "Responsibilities",
+      originalValue,
+      modifiedValue: activityAvailability,
       metadata: { activityAvailability },
     });
 

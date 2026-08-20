@@ -62,9 +62,10 @@ export const StudentInfoModal: React.FC<StudentInfoModalProps> = ({
       setError("Please enter your Email address.");
       return;
     }
-    const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
-    if (!emailRegex.test(trimmedEmail)) {
-      setError("Please enter a valid Email address format (e.g. student@college.edu).");
+    const lowerEmail = trimmedEmail.toLowerCase();
+    const emailParts = lowerEmail.split("@");
+    if (emailParts.length !== 2 || !emailParts[0] || `@${emailParts[1]}` !== "@mepcoeng.ac.in") {
+      setError("Please use your Mepco college email address ending with @mepcoeng.ac.in.");
       return;
     }
     if (!trimmedRoll) {
@@ -108,7 +109,7 @@ export const StudentInfoModal: React.FC<StudentInfoModalProps> = ({
       // Success — Proceed to test
       setIsChecking(false);
       onProceed(studentInfo);
-    } catch (err: any) {
+    } catch (err: unknown) {
       console.error("Validation error:", err);
       setError("Failed to verify attempt status. Please check your connection and try again.");
       setIsChecking(false);
@@ -179,7 +180,7 @@ export const StudentInfoModal: React.FC<StudentInfoModalProps> = ({
               className="w-full px-3.5 py-2.5 rounded-xl bg-[#07111F] border border-white/10 text-sm text-[#F8FAFC] focus:outline-none focus:border-[#0078D4] focus:ring-1 focus:ring-[#0078D4] transition-all cursor-pointer"
             >
               {STUDENT_DEPARTMENTS.map((dept) => (
-                <option key={dept} value={dept} className="bg-[#0D1B2A] text-white">
+                <option key={dept} value={dept}>
                   {dept}
                 </option>
               ))}
@@ -201,10 +202,10 @@ export const StudentInfoModal: React.FC<StudentInfoModalProps> = ({
                 onChange={(e) => setYear(e.target.value)}
                 className="w-full px-3.5 py-2.5 rounded-xl bg-[#07111F] border border-white/10 text-sm text-[#F8FAFC] focus:outline-none focus:border-[#0078D4] focus:ring-1 focus:ring-[#0078D4] transition-all cursor-pointer"
               >
-                <option value="1" className="bg-[#0D1B2A] text-white">1st Year</option>
-                <option value="2" className="bg-[#0D1B2A] text-white">2nd Year</option>
-                <option value="3" className="bg-[#0D1B2A] text-white">3rd Year</option>
-                <option value="4" className="bg-[#0D1B2A] text-white">4th Year</option>
+                <option value="1">1st Year</option>
+                <option value="2">2nd Year</option>
+                <option value="3">3rd Year</option>
+                <option value="4">4th Year</option>
               </select>
             </div>
 
@@ -237,13 +238,13 @@ export const StudentInfoModal: React.FC<StudentInfoModalProps> = ({
               type="email"
               required
               disabled={isChecking}
-              placeholder="student@example.com"
+              placeholder="student@mepcoeng.ac.in"
               value={email}
               onChange={(e) => setEmail(e.target.value)}
               className="w-full px-3.5 py-2.5 rounded-xl bg-[#07111F] border border-white/10 text-sm text-[#F8FAFC] placeholder-[#64748B] focus:outline-none focus:border-[#0078D4] focus:ring-1 focus:ring-[#0078D4] transition-all"
             />
             <p className="text-[11px] text-[#94A3B8]">
-              Used for single-attempt verification and recording your score.
+              Must be your official college email address ending with <span className="text-[#22D3EE] font-mono">@mepcoeng.ac.in</span>.
             </p>
           </div>
 

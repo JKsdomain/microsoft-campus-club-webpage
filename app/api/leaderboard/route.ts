@@ -4,22 +4,26 @@ import { dbConnect } from "@/lib/db/dbConnect";
 import { LeaderboardWeek, TestAttempt, Admin, OfficeBearer, AuditLog } from "@/lib/db/models";
 
 // GET /api/leaderboard
-// Returns leaderboard publication state and calculated rankings from MongoDB TestAttempts.
+// Returns leaderboard publication state and calculated rankings from MongoDB TestAttempts strictly for PLACEMENT QUESTIONS.
 // If unpublished, returns { isPublished: false, message: "Leaderboard will be available once it is published.", entries: [] }
-export async function GET(req: Request) {
+export async function GET() {
   try {
     await dbConnect();
 
-    // 1. Query current LeaderboardWeek document
-    let weekDoc = await LeaderboardWeek.findOne().sort({ createdAt: -1 });
+    // 1. Query current LeaderboardWeek document for Placement Questions
+    let weekDoc = await LeaderboardWeek.findOne({
+      activityType: { $in: ["PLACEMENT_QUESTIONS", "Placement Questions", "ALL"] }
+    }).sort({ createdAt: -1 });
+
     const isPublished = Boolean(weekDoc?.isPublished || weekDoc?.status === "PUBLISHED");
 
-    // 2. Calculate rankings from persisted MongoDB TestAttempt documents
+    // 2. Calculate rankings from persisted MongoDB TestAttempt documents strictly for Placement Questions
     const attempts = await TestAttempt.find({
       status: { $in: ["COMPLETED", "SUBMITTED"] },
+      activityType: { $in: ["Placement Questions", "PLACEMENT_QUESTIONS", "PLACEMENT"] },
     })
       .sort({ score: -1, percentage: -1, submittedAt: 1 })
-      .limit(100);
+      .limit(200);
 
     // Deduplicate to take best attempt per student email
     const studentBestMap = new Map<string, any>();
@@ -51,9 +55,11 @@ export async function GET(req: Request) {
       section: att.section || "A",
       rollNumber: att.rollNumber || "N/A",
       score: att.score,
+      totalQuestions: att.totalQuestions || 0,
+      correctAnswersCount: att.correctAnswersCount || 0,
+      wrongAnswersCount: att.wrongAnswersCount || 0,
       percentage: att.percentage,
-      totalQuestions: att.totalQuestions,
-      testType: att.activityType || att.testType,
+      testType: "Placement Questions",
       timestamp: att.submittedAt
         ? new Date(att.submittedAt).toISOString().replace("T", " ").substring(0, 16)
         : "",
@@ -68,6 +74,7 @@ export async function GET(req: Request) {
         publishedBy: null,
         publishedByRole: null,
         weekNumber: weekDoc?.weekNumber || 1,
+        activityType: "Placement Questions",
       });
     }
 
@@ -78,26 +85,28 @@ export async function GET(req: Request) {
       publishedByRole: weekDoc?.publishedByRole || null,
       entries,
       weekNumber: weekDoc?.weekNumber || 1,
+      activityType: "Placement Questions",
     });
   } catch (error: any) {
     console.error("❌ [API GET /leaderboard] Error:", error);
     return NextResponse.json(
-      { message: "Failed to fetch leaderboard.", error: error.message },
+      { message: "Failed to fetch placement leaderboard.", error: error.message },
       { status: 500 }
     );
   }
 }
 
 // POST /api/leaderboard
-// Body: { action: "publish" | "unpublish", activityType?: string }
+// Body: { action: "publish" | "unpublish" }
 // Server-side authenticated publish control:
 // - Admin: Allowed to publish/unpublish.
-// - Responsible OB: Allowed ONLY if assigned to the corresponding activity.
+// - Responsible OB: Allowed ONLY if assigned to "Placement Questions".
+// - Any other OB: Rejected with HTTP 403.
 export async function POST(req: Request) {
   try {
     await dbConnect();
     const body = await req.json().catch(() => ({}));
-    const { action = "publish", activityType } = body;
+    const { action = "publish" } = body;
 
     // 1. Authenticate Requester Session
     const cookieStore = await cookies();
@@ -134,59 +143,42 @@ export async function POST(req: Request) {
 
     if (!role) {
       return NextResponse.json(
-        { message: "Unauthorized. You must be logged in as an Administrator or Office Bearer to perform this action." },
+        { message: "Unauthorized. You must be logged in as an Administrator or Placement Office Bearer to perform this action." },
         { status: 401 }
       );
     }
 
-    // 2. Server-Side Authorization Check
+    // 2. Server-Side Authorization Check: STRICTLY PLACEMENT QUESTIONS ONLY
     if (role === "OFFICE_BEARER") {
-      if (obResponsibility === "Unassigned" || !obResponsibility) {
+      const normalizedResp = obResponsibility.toLowerCase().replace(/_/g, " ").trim();
+      if (!normalizedResp.includes("placement")) {
         return NextResponse.json(
-          { message: "Unauthorized: You do not have an assigned responsibility to publish leaderboards." },
+          {
+            message: `Unauthorized: Office Bearer assigned to "${obResponsibility}" cannot publish the Placement Questions leaderboard. Only the Placement Questions OB or Admin is authorized.`,
+          },
           { status: 403 }
         );
-      }
-
-      // If a specific activityType is specified, verify it matches the OB's assigned responsibility
-      if (activityType) {
-        const normalizedAct = activityType.toLowerCase().replace(/_/g, " ").trim();
-        const normalizedResp = obResponsibility.toLowerCase().replace(/_/g, " ").trim();
-
-        if (!normalizedResp.includes(normalizedAct) && !normalizedAct.includes(normalizedResp)) {
-          return NextResponse.json(
-            {
-              message: `Unauthorized: You are assigned to "${obResponsibility}" and cannot publish the leaderboard for "${activityType}".`,
-            },
-            { status: 403 }
-          );
-        }
-      } else {
-        // General leaderboard publish allowed for responsible OBs of General Quiz and Placement Questions
-        if (obResponsibility !== "General Quiz" && obResponsibility !== "Placement Questions") {
-          return NextResponse.json(
-            {
-              message: `Unauthorized: Office Bearer assigned to "${obResponsibility}" cannot publish the assessment leaderboard.`,
-            },
-            { status: 403 }
-          );
-        }
       }
     }
 
     // 3. Update or Create MongoDB LeaderboardWeek Document
-    let weekDoc = await LeaderboardWeek.findOne().sort({ createdAt: -1 });
+    let weekDoc = await LeaderboardWeek.findOne({
+      activityType: { $in: ["PLACEMENT_QUESTIONS", "Placement Questions", "ALL"] }
+    }).sort({ createdAt: -1 });
+
     if (!weekDoc) {
       weekDoc = new LeaderboardWeek({
         weekNumber: 1,
-        activityType: activityType || "ALL",
+        activityType: "PLACEMENT_QUESTIONS",
         startDate: new Date(),
         endDate: new Date(Date.now() + 7 * 24 * 60 * 60 * 1000),
       });
     }
 
+    const wasPublished = weekDoc.isPublished;
     const isPub = action !== "unpublish";
     weekDoc.isPublished = isPub;
+    weekDoc.activityType = "PLACEMENT_QUESTIONS";
     weekDoc.status = isPub ? "PUBLISHED" : "UNPUBLISHED";
     weekDoc.publishedAt = isPub ? new Date() : null;
     weekDoc.publishedBy = isPub ? actorName : null;
@@ -197,18 +189,24 @@ export async function POST(req: Request) {
     await AuditLog.create({
       actorId: actorEmail || null,
       actorType: role,
+      actorName,
+      actorEmail: actorEmail || undefined,
+      role: role === "ADMIN" ? "Administrator" : "Office Bearer",
       action: isPub ? "LEADERBOARD_PUBLISHED" : "LEADERBOARD_UNPUBLISHED",
       module: "Leaderboard",
       targetId: weekDoc._id,
+      targetType: "LEADERBOARD_WEEK",
+      originalValue: { isPublished: wasPublished, status: wasPublished ? "PUBLISHED" : "UNPUBLISHED" },
+      modifiedValue: { isPublished: isPub, status: isPub ? "PUBLISHED" : "UNPUBLISHED" },
       metadata: {
         publisher: actorName,
         publisherRole: role,
-        activity: activityType || obResponsibility || "Weekly Assessment",
+        activity: "Placement Questions",
         timestamp: new Date(),
       },
     });
 
-    console.log(`✅ [MONGODB ATLAS] Leaderboard ${isPub ? "PUBLISHED" : "UNPUBLISHED"} by ${actorName} (${role})`);
+    console.log(`✅ [MONGODB ATLAS] Placement Leaderboard ${isPub ? "PUBLISHED" : "UNPUBLISHED"} by ${actorName} (${role})`);
 
     return NextResponse.json({
       success: true,
@@ -217,6 +215,7 @@ export async function POST(req: Request) {
       publishedBy: weekDoc.publishedBy,
       publishedByRole: weekDoc.publishedByRole,
       weekNumber: weekDoc.weekNumber,
+      activityType: "Placement Questions",
     });
   } catch (error: any) {
     console.error("❌ [API POST /leaderboard] Error:", error);
@@ -226,3 +225,4 @@ export async function POST(req: Request) {
     );
   }
 }
+

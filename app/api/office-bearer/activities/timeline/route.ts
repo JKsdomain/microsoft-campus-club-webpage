@@ -135,21 +135,29 @@ async function handleTimelineUpdate(req: Request) {
 
     // 8. Create AuditLog entry
     const activityDisplayName = proposal.type === "GENERAL_QUIZ" ? "General Quiz" : "Placement Questions";
-    const logAction = `OB extended/adjusted ${activityDisplayName} timeline for "${proposal.title}" (New End: ${newEndAt.toLocaleString()})`;
 
     await AuditLog.create({
       actorType: obResponsibility === "ADMIN" ? "ADMIN" : "OFFICE_BEARER",
-      action: logAction,
-      module: "Approval Workflow",
+      actorName,
+      actorEmail,
+      role: obResponsibility === "ADMIN" ? "Administrator" : "Office Bearer",
+      action: "ACTIVITY_TIMELINE_UPDATED",
+      module: activityDisplayName,
       targetId: proposal._id,
+      targetType: proposal.type,
+      originalValue: {
+        startAt: previousStartAt ? previousStartAt.toISOString() : null,
+        endAt: previousEndAt ? previousEndAt.toISOString() : null,
+      },
+      modifiedValue: {
+        startAt: newStartAt.toISOString(),
+        endAt: newEndAt.toISOString(),
+      },
       metadata: {
         activityId: String(proposal._id),
         activityType: proposal.type,
         actorName,
         actorEmail,
-        previousStartAt: previousStartAt ? previousStartAt.toISOString() : null,
-        previousEndAt: previousEndAt ? previousEndAt.toISOString() : null,
-        newStartAt: newStartAt.toISOString(),
         newEndAt: newEndAt.toISOString(),
       },
     });

@@ -1,7 +1,7 @@
 "use client";
 
 import React, { useState } from "react";
-import { History, Eye, X, CheckCircle2, Clock, XCircle, FileText, Edit3, RefreshCw, AlertCircle, Calendar, Image as ImageIcon, Video, UploadCloud, Trash2 } from "lucide-react";
+import { History, Eye, X, CheckCircle2, Clock, XCircle, FileText, Edit3, RefreshCw, AlertCircle, Calendar, Image as ImageIcon, Video, UploadCloud, Trash2, Archive } from "lucide-react";
 import { useOBAuth } from "./OBAuthProvider";
 import { Button } from "../ui/Button";
 import { LoadingState } from "../ui/LoadingState";
@@ -25,10 +25,18 @@ interface GenericSubmission {
 }
 
 export const OBSubmissions: React.FC = () => {
-  const { currentOb, submissions, feedPosts, submitRevision, extendDeadline } = useOBAuth();
+  const { currentOb, submissions, feedPosts, submitRevision, extendDeadline, deleteFeedPost, refreshProposals } = useOBAuth();
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(false);
   const [selectedSubmission, setSelectedSubmission] = useState<GenericSubmission | null>(null);
+
+  // Archive Placement Quiz confirmation state
+  const [archiveTarget, setArchiveTarget] = useState<GenericSubmission | null>(null);
+  const [isArchiving, setIsArchiving] = useState(false);
+
+  // Delete Feed confirmation state
+  const [deleteTarget, setDeleteTarget] = useState<GenericSubmission | null>(null);
+  const [isDeleting, setIsDeleting] = useState(false);
 
   // Edit revision modal state
   const [editingSubmission, setEditingSubmission] = useState<GenericSubmission | null>(null);
@@ -450,6 +458,28 @@ export const OBSubmissions: React.FC = () => {
                             Edit
                           </Button>
                         )}
+                        {sub.status === "Approved" && sub.type === "Placement Questions" && (
+                          <Button
+                            variant="outline"
+                            size="sm"
+                            leftIcon={<Archive className="w-3.5 h-3.5" />}
+                            className="text-amber-400 hover:bg-amber-500/10 hover:border-amber-500/30"
+                            onClick={() => setArchiveTarget(sub)}
+                          >
+                            Archive
+                          </Button>
+                        )}
+                        {sub.type === "Feed Community" && (
+                          <Button
+                            variant="ghost"
+                            size="sm"
+                            leftIcon={<Trash2 className="w-3.5 h-3.5" />}
+                            className="text-red-400 hover:text-red-300 hover:bg-red-500/10"
+                            onClick={() => setDeleteTarget(sub)}
+                          >
+                            Delete
+                          </Button>
+                        )}
                         {sub.status === "Approved" && hasPendingRevision(sub.id) && (
                           <span className="text-[10px] font-mono text-purple-400 bg-purple-500/10 px-2 py-1 rounded border border-purple-500/20">
                             Revision Pending
@@ -526,6 +556,28 @@ export const OBSubmissions: React.FC = () => {
                         onClick={() => handleOpenEdit(sub)}
                       >
                         Edit
+                      </Button>
+                    )}
+                    {sub.status === "Approved" && sub.type === "Placement Questions" && (
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        leftIcon={<Archive className="w-3.5 h-3.5" />}
+                        className="text-amber-400 hover:bg-amber-500/10 hover:border-amber-500/30"
+                        onClick={() => setArchiveTarget(sub)}
+                      >
+                        Archive
+                      </Button>
+                    )}
+                    {sub.type === "Feed Community" && (
+                      <Button
+                        variant="ghost"
+                        size="sm"
+                        leftIcon={<Trash2 className="w-3.5 h-3.5" />}
+                        className="text-red-400 hover:text-red-300 hover:bg-red-500/10"
+                        onClick={() => setDeleteTarget(sub)}
+                      >
+                        Delete
                       </Button>
                     )}
                   </div>
@@ -926,6 +978,123 @@ export const OBSubmissions: React.FC = () => {
                 </div>
               </>
             )}
+          </div>
+        </div>
+      )}
+
+      {/* Archive Placement Quiz Confirmation Dialog */}
+      {archiveTarget && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/80 backdrop-blur-sm animate-fade-in">
+          <div className="w-full max-w-md rounded-2xl bg-[#0D1B2A] border border-amber-500/30 p-6 shadow-2xl space-y-4">
+            <div className="flex items-center space-x-3 text-amber-400">
+              <div className="p-2 rounded-xl bg-amber-500/10 border border-amber-500/20">
+                <Archive className="w-6 h-6" />
+              </div>
+              <div>
+                <h3 className="text-lg font-bold text-[#F8FAFC]">Archive this Placement Quiz?</h3>
+                <p className="text-xs text-[#94A3B8]">Confirmation required</p>
+              </div>
+            </div>
+
+            <p className="text-sm text-[#CBD5E1] leading-relaxed">
+              Are you sure you want to archive this placement quiz? It will no longer be available for students to attempt, but all historical attempts and records will remain safely preserved in MongoDB.
+            </p>
+
+            <div className="p-3 rounded-xl bg-[#07111F] border border-white/10 text-xs text-[#94A3B8] font-mono line-clamp-2 italic">
+              &quot;{archiveTarget.title}&quot;
+            </div>
+
+            <div className="pt-2 flex items-center justify-end space-x-3">
+              <Button
+                variant="ghost"
+                size="md"
+                disabled={isArchiving}
+                onClick={() => setArchiveTarget(null)}
+              >
+                Cancel
+              </Button>
+              <Button
+                variant="primary"
+                size="md"
+                disabled={isArchiving}
+                onClick={async () => {
+                  setIsArchiving(true);
+                  try {
+                    const res = await fetch("/api/admin/proposals", {
+                      method: "PUT",
+                      headers: { "Content-Type": "application/json" },
+                      body: JSON.stringify({ id: archiveTarget.id, action: "archive" }),
+                    });
+                    if (res.ok) {
+                      await refreshProposals();
+                      setArchiveTarget(null);
+                    } else {
+                      const err = await res.json().catch(() => ({}));
+                      alert(err.message || "Failed to archive activity.");
+                    }
+                  } catch {
+                    alert("Network error while archiving activity.");
+                  } finally {
+                    setIsArchiving(false);
+                  }
+                }}
+                className="bg-amber-600 hover:bg-amber-700 text-white border-amber-500"
+              >
+                {isArchiving ? "Archiving..." : "Archive"}
+              </Button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Delete Confirmation Dialog */}
+      {deleteTarget && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/80 backdrop-blur-sm animate-fade-in">
+          <div className="w-full max-w-md rounded-2xl bg-[#0D1B2A] border border-red-500/30 p-6 shadow-2xl space-y-4">
+            <div className="flex items-center space-x-3 text-red-400">
+              <div className="p-2 rounded-xl bg-red-500/10 border border-red-500/20">
+                <Trash2 className="w-6 h-6" />
+              </div>
+              <div>
+                <h3 className="text-lg font-bold text-[#F8FAFC]">Delete this post?</h3>
+                <p className="text-xs text-[#94A3B8]">Confirmation required</p>
+              </div>
+            </div>
+
+            <p className="text-sm text-[#CBD5E1] leading-relaxed">
+              Are you sure you want to remove this feed post? This action cannot be undone.
+            </p>
+
+            <div className="p-3 rounded-xl bg-[#07111F] border border-white/10 text-xs text-[#94A3B8] font-mono line-clamp-2 italic">
+              &quot;{deleteTarget.title}&quot;
+            </div>
+
+            <div className="pt-2 flex items-center justify-end space-x-3">
+              <Button
+                variant="ghost"
+                size="md"
+                disabled={isDeleting}
+                onClick={() => setDeleteTarget(null)}
+              >
+                Cancel
+              </Button>
+              <Button
+                variant="primary"
+                size="md"
+                disabled={isDeleting}
+                onClick={async () => {
+                  setIsDeleting(true);
+                  const success = await deleteFeedPost(deleteTarget.id);
+                  setIsDeleting(false);
+                  if (success) {
+                    setDeleteTarget(null);
+                  }
+                }}
+                className="bg-red-600 hover:bg-red-700 text-white"
+              >
+                {isDeleting ? "Deleting..." : "Delete"}
+              </Button>
+            </div>
           </div>
         </div>
       )}

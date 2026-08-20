@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
+import { cookies } from "next/headers";
 import { dbConnect } from "@/lib/db/dbConnect";
-import { ProposalModel, AuditLog } from "@/lib/db/models";
+import { ProposalModel, OfficeBearer, AuditLog } from "@/lib/db/models";
 import mongoose from "mongoose";
 
 // GET /api/admin/proposals
@@ -182,9 +183,21 @@ export async function POST(req: Request) {
     // Audit log
     await AuditLog.create({
       actorType: "OFFICE_BEARER",
-      action: `Submitted ${type} proposal: "${generatedTitle}"`,
+      actorName: submittedBy,
+      role: "Office Bearer",
+      action: "PROPOSAL_SUBMITTED",
       module: "Approval Workflow",
       targetId: proposal._id,
+      targetType: proposal.type,
+      originalValue: null,
+      modifiedValue: {
+        title: generatedTitle,
+        type: dbType,
+        submittedBy,
+        authorDepartment,
+        timerMinutes: proposal.timerMinutes,
+        questionsCount: proposal.questionsDetected || 0,
+      },
       metadata: { submittedBy, type: dbType },
     });
 
@@ -233,8 +246,7 @@ export async function POST(req: Request) {
 }
 
 // PUT /api/admin/proposals
-// Admin approves, rejects, votes, or OB creates a revision of a proposal.
-// Body: { id: string, action: 'approve' | 'reject' | 'vote' | 'revise', revisionComment?: string, changes?: any, rejectionReason?: string, vote?: 'like' | 'dislike', currentVote?: 'like' | 'dislike' | null }
+// Admin approves, rejects, votes, archives, or OB creates a revision of a proposal.
 export async function PUT(req: Request) {
   try {
     await dbConnect();
@@ -297,9 +309,23 @@ export async function PUT(req: Request) {
 
       await AuditLog.create({
         actorType: "OFFICE_BEARER",
-        action: `Submitted revision #${newRevision.revisionNumber} for re-approval: "${proposal.title}"`,
+        actorName: proposal.submittedBy,
+        role: "Office Bearer",
+        action: "PROPOSAL_REVISED",
         module: "Approval Workflow",
         targetId: newRevision._id,
+        targetType: proposal.type,
+        originalValue: {
+          revisionNumber: proposal.revisionNumber || 0,
+          title: proposal.title,
+          status: proposal.status,
+        },
+        modifiedValue: {
+          revisionNumber: newRevision.revisionNumber,
+          title: newRevision.title,
+          status: "PENDING_REAPPROVAL",
+          changes,
+        },
         metadata: { parentId: String(proposal._id), revisionNumber: newRevision.revisionNumber, revisionComment },
       });
 
@@ -310,6 +336,108 @@ export async function PUT(req: Request) {
         revisionId: String(newRevision._id),
         revisionNumber: newRevision.revisionNumber,
       }, { status: 201 });
+    }
+
+    // ----- ARCHIVE PLACEMENT QUIZ OR PROPOSAL (Issue 16) -----
+    if (action === "archive") {
+      const cookieStore = await cookies();
+      const adminCookie = cookieStore.get("mcc_admin_session");
+      const obCookie = cookieStore.get("mcc_ob_session");
+
+      let isAdmin = false;
+      let isAuthorizedOB = false;
+      let actorName = "Administrator";
+      let actorEmail = "";
+
+      if (adminCookie?.value) {
+        try {
+          const session = JSON.parse(adminCookie.value);
+          if (session.role === "ADMIN") {
+            isAdmin = true;
+            actorName = session.email?.split("@")[0] || "Administrator";
+            actorEmail = session.email || "";
+          }
+        } catch {}
+      }
+
+      let currentOb: any = null;
+      if (!isAdmin && obCookie?.value) {
+        try {
+          const session = JSON.parse(obCookie.value);
+          if (session.email) {
+            currentOb = await OfficeBearer.findOne({
+              email: session.email.toLowerCase(),
+              status: "ACTIVE",
+            }).populate("responsibilityId");
+            if (currentOb) {
+              actorName = currentOb.name;
+              actorEmail = currentOb.email;
+            }
+          }
+        } catch {}
+      }
+
+      if (isAdmin) {
+        isAuthorizedOB = true;
+      } else if (currentOb) {
+        const hasPlacementResp =
+          currentOb.responsibilityId &&
+          currentOb.responsibilityId.name === "Placement Questions";
+        const isAuthor =
+          proposal.submittedBy === currentOb.name ||
+          (proposal as any).authorEmail === currentOb.email;
+
+        if (
+          proposal.type === "PLACEMENT_QUESTIONS" &&
+          (hasPlacementResp || isAuthor)
+        ) {
+          isAuthorizedOB = true;
+        }
+      }
+
+      if (!isAuthorizedOB) {
+        return NextResponse.json(
+          { message: "Forbidden. You are not authorized to archive this activity." },
+          { status: 403 }
+        );
+      }
+
+      const previousStatus = proposal.status;
+      proposal.status = "ARCHIVED";
+      proposal.isActive = false;
+      proposal.archivedAt = new Date();
+      await proposal.save();
+
+      await AuditLog.create({
+        actorType: isAdmin ? "ADMIN" : "OFFICE_BEARER",
+        actorName,
+        actorEmail,
+        role: isAdmin ? "Administrator" : "Office Bearer",
+        action:
+          proposal.type === "PLACEMENT_QUESTIONS"
+            ? "PLACEMENT_QUIZ_ARCHIVED"
+            : "PROPOSAL_ARCHIVED",
+        module:
+          proposal.type === "PLACEMENT_QUESTIONS"
+            ? "Placement Questions"
+            : "Approval Workflow",
+        targetId: proposal._id,
+        targetType: proposal.type,
+        originalValue: { status: previousStatus, isActive: true },
+        modifiedValue: { status: "ARCHIVED", isActive: false, archivedAt: proposal.archivedAt },
+        metadata: {
+          title: proposal.title,
+          previousStatus,
+          newStatus: "ARCHIVED",
+          archivedBy: actorName,
+        },
+      });
+
+      console.log(`✅ [MONGODB ATLAS] Proposal ${id} archived by ${actorName}`);
+      return NextResponse.json({
+        message: "Activity successfully archived.",
+        proposal: { id: String(proposal._id), status: "Archived" },
+      });
     }
 
     // ----- APPROVAL -----
@@ -325,11 +453,14 @@ export async function PUT(req: Request) {
         }
 
         // Archive the old published version
+        const oldParentStatus = parentProposal.status;
         parentProposal.status = "ARCHIVED";
         parentProposal.isActive = false;
+        parentProposal.archivedAt = new Date();
         await parentProposal.save();
 
         // Publish the new revision
+        const oldRevStatus = proposal.status;
         proposal.status = "APPROVED";
         proposal.isActive = true;
         proposal.reviewedAt = new Date();
@@ -338,17 +469,27 @@ export async function PUT(req: Request) {
         // Audit logs
         await AuditLog.create({
           actorType: "ADMIN",
-          action: `Archived old version of: "${parentProposal.title}" (replaced by revision #${proposal.revisionNumber})`,
+          actorName: "Administrator",
+          role: "Administrator",
+          action: "PROPOSAL_ARCHIVED",
           module: "Approval Workflow",
           targetId: parentProposal._id,
+          targetType: parentProposal.type,
+          originalValue: { status: oldParentStatus, isActive: true },
+          modifiedValue: { status: "ARCHIVED", isActive: false },
           metadata: { action: "archive", replacedBy: String(proposal._id), revisionNumber: proposal.revisionNumber },
         });
 
         await AuditLog.create({
           actorType: "ADMIN",
-          action: `Approved revision #${proposal.revisionNumber} for: "${proposal.title}"`,
+          actorName: "Administrator",
+          role: "Administrator",
+          action: "PROPOSAL_APPROVED",
           module: "Approval Workflow",
           targetId: proposal._id,
+          targetType: proposal.type,
+          originalValue: { status: oldRevStatus, isActive: false },
+          modifiedValue: { status: "APPROVED", isActive: true },
           metadata: { action: "approve_revision", parentId: String(parentProposal._id), revisionNumber: proposal.revisionNumber },
         });
 
@@ -363,6 +504,7 @@ export async function PUT(req: Request) {
         });
       } else {
         // --- NORMAL APPROVAL (new submission) ---
+        const oldStatus = proposal.status;
         proposal.status = "APPROVED";
         proposal.reviewedAt = new Date();
         proposal.isActive = true;
@@ -370,9 +512,14 @@ export async function PUT(req: Request) {
 
         await AuditLog.create({
           actorType: "ADMIN",
-          action: `Approved proposal: "${proposal.title}"`,
+          actorName: "Administrator",
+          role: "Administrator",
+          action: "PROPOSAL_APPROVED",
           module: "Approval Workflow",
           targetId: proposal._id,
+          targetType: proposal.type,
+          originalValue: { status: oldStatus, isActive: false },
+          modifiedValue: { status: "APPROVED", isActive: true },
           metadata: { action, proposalType: proposal.type },
         });
 
@@ -388,6 +535,7 @@ export async function PUT(req: Request) {
       }
     } else if (action === "reject") {
       const isRevision = proposal.status === "PENDING_REAPPROVAL" && proposal.parentId;
+      const oldStatus = proposal.status;
 
       // Set status to REJECTED — if revision, old version stays published
       proposal.status = "REJECTED";
@@ -400,9 +548,15 @@ export async function PUT(req: Request) {
 
       await AuditLog.create({
         actorType: "ADMIN",
-        action: `Rejected ${isRevision ? `revision #${proposal.revisionNumber} for` : "proposal:"} "${proposal.title}"`,
+        actorName: "Administrator",
+        role: "Administrator",
+        action: "PROPOSAL_REJECTED",
         module: "Approval Workflow",
         targetId: proposal._id,
+        targetType: proposal.type,
+        originalValue: { status: oldStatus },
+        modifiedValue: { status: "REJECTED", isActive: false },
+        reason: rejectionReason || null,
         metadata: { action, proposalType: proposal.type, isRevision: !!isRevision, parentId: proposal.parentId ? String(proposal.parentId) : null },
       });
 

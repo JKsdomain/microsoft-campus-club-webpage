@@ -73,9 +73,19 @@ export async function POST(req: Request) {
     // Write Audit Log to MongoDB Atlas
     await AuditLog.create({
       actorType: "ADMIN",
-      action: `Created Office Bearer (${newOb.name})`,
+      actorName: "Administrator",
+      role: "Administrator",
+      action: "OB_CREATED",
       module: "User Management",
       targetId: newOb._id,
+      targetType: "OFFICE_BEARER",
+      originalValue: null,
+      modifiedValue: {
+        name: newOb.name,
+        email: newOb.email,
+        department: newOb.department,
+        status: newOb.status,
+      },
       metadata: { email: newOb.email, department: newOb.department },
     });
 
@@ -108,10 +118,19 @@ export async function PUT(req: Request) {
       return NextResponse.json({ message: "User ID is required." }, { status: 400 });
     }
 
-    const ob = await OfficeBearer.findById(id);
+    const ob = await OfficeBearer.findById(id).populate("responsibilityId");
     if (!ob) {
       return NextResponse.json({ message: "Office Bearer not found in database." }, { status: 404 });
     }
+
+    // Capture original state before mutation
+    const originalValue = {
+      name: ob.name,
+      email: ob.email,
+      department: ob.department,
+      status: ob.status,
+      responsibility: ob.responsibilityId ? (ob.responsibilityId.name || String(ob.responsibilityId)) : "Unassigned",
+    };
 
     if (name) ob.name = String(name).trim();
     if (email) ob.email = String(email).trim().toLowerCase();
@@ -133,12 +152,27 @@ export async function PUT(req: Request) {
     await ob.save();
     await ob.populate("responsibilityId");
 
-    // Audit Log in MongoDB
+    const modifiedValue = {
+      name: ob.name,
+      email: ob.email,
+      department: ob.department,
+      status: ob.status,
+      responsibility: ob.responsibilityId ? (ob.responsibilityId.name || String(ob.responsibilityId)) : "Unassigned",
+      passwordChanged: Boolean(newPassword),
+    };
+
+    // Audit Log in MongoDB with original & modified values
     await AuditLog.create({
       actorType: "ADMIN",
-      action: `Updated Office Bearer (${ob.name})`,
+      actorName: "Administrator",
+      role: "Administrator",
+      action: newPassword ? "OB_CREDENTIALS_CHANGED" : "OB_UPDATED",
       module: "User Management",
       targetId: ob._id,
+      targetType: "OFFICE_BEARER",
+      originalValue,
+      modifiedValue,
+      metadata: { targetName: ob.name, targetEmail: ob.email },
     });
 
     const userObj = {
@@ -177,8 +211,19 @@ export async function DELETE(req: Request) {
 
     await AuditLog.create({
       actorType: "ADMIN",
-      action: `Deleted Office Bearer (${ob.name})`,
+      actorName: "Administrator",
+      role: "Administrator",
+      action: "OB_DELETED",
       module: "User Management",
+      targetId: id,
+      targetType: "OFFICE_BEARER",
+      originalValue: {
+        name: ob.name,
+        email: ob.email,
+        department: ob.department,
+        status: ob.status,
+      },
+      modifiedValue: null,
     });
 
     console.log(`✅ [MONGODB ATLAS] Deleted Office Bearer ID: ${id}`);

@@ -1,21 +1,49 @@
 "use client";
 
-import React from "react";
+import React, { useEffect, useState } from "react";
 import { Users, UserCheck, Activity, Award, HelpCircle, Code2 } from "lucide-react";
 import { useAdminAuth } from "./AdminAuthProvider";
 
+interface DashboardStatsData {
+  totalObs: number;
+  activeObs: number;
+  totalParticipants: number;
+  placementAttemptsCount: number;
+  quizAttemptsCount: number;
+  feedPostsCount: number;
+  techGamesCount: number;
+  totalProposals: number;
+  activeAnnouncements: number;
+}
+
 export const DashboardStats: React.FC = () => {
   const { officeBearers, assignments } = useAdminAuth();
+  const [liveStats, setLiveStats] = useState<DashboardStatsData | null>(null);
 
-  const totalObCount = officeBearers.length;
-  const activeObCount = officeBearers.filter((ob) => ob.status === "Active").length;
+  useEffect(() => {
+    fetch("/api/admin/dashboard-stats")
+      .then((res) => res.json())
+      .then((data) => {
+        if (data && typeof data.totalObs === "number") {
+          setLiveStats(data);
+        }
+      })
+      .catch((err) => console.error("Error fetching dashboard stats:", err));
+  }, [officeBearers.length]);
+
+  const totalObCount = liveStats ? liveStats.totalObs : officeBearers.length;
+  const activeObCount = liveStats ? liveStats.activeObs : officeBearers.filter((ob) => ob.status === "Active").length;
   const assignedActivitiesCount = assignments.filter((a) => a.assignmentStatus === "Assigned").length;
+  const totalParticipants = liveStats ? liveStats.totalParticipants : 0;
+  const placementAttempts = liveStats ? liveStats.placementAttemptsCount : 0;
+  const quizAttempts = liveStats ? liveStats.quizAttemptsCount : 0;
+  const totalActivities = 4;
 
   const stats = [
     {
-      title: "TOTAL MEMBERS",
-      value: "1,250",
-      change: "+12% this month",
+      title: "TOTAL UNIQUE PARTICIPANTS",
+      value: totalParticipants > 0 ? `${totalParticipants}` : "0",
+      change: totalParticipants > 0 ? "Persisted MongoDB Attempts" : "No student attempts yet",
       icon: Users,
       color: "text-[#0078D4]",
       bgColor: "bg-[#0078D4]/10",
@@ -32,7 +60,7 @@ export const DashboardStats: React.FC = () => {
     },
     {
       title: "TOTAL ACTIVITIES",
-      value: "4",
+      value: `${totalActivities}`,
       change: `${assignedActivitiesCount} Assigned Leads`,
       icon: Activity,
       color: "text-purple-400",
@@ -40,9 +68,9 @@ export const DashboardStats: React.FC = () => {
       borderColor: "border-purple-500/20",
     },
     {
-      title: "TOTAL PARTICIPANTS",
-      value: "3,840",
-      change: "+18% active participation",
+      title: "TOTAL TEST ATTEMPTS",
+      value: `${placementAttempts + quizAttempts}`,
+      change: (placementAttempts + quizAttempts) > 0 ? "Recorded Submissions" : "No submissions yet",
       icon: Award,
       color: "text-emerald-400",
       bgColor: "bg-emerald-500/10",
@@ -53,12 +81,12 @@ export const DashboardStats: React.FC = () => {
   const subStats = [
     {
       title: "Placement Question Participants",
-      value: "1,850",
+      value: placementAttempts > 0 ? `${placementAttempts}` : "0",
       icon: Code2,
     },
     {
-      title: "Quiz Participants",
-      value: "1,420",
+      title: "General Quiz Participants",
+      value: quizAttempts > 0 ? `${quizAttempts}` : "0",
       icon: HelpCircle,
     },
   ];
@@ -129,3 +157,4 @@ export const DashboardStats: React.FC = () => {
     </div>
   );
 };
+

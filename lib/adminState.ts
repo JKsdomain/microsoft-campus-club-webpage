@@ -65,10 +65,17 @@ export interface AuditLog {
   id: string;
   timestamp: string;
   actor: string;
+  actorEmail?: string;
   role: string;
   action: string;
   module: string;
   status: "Success" | "Warning" | "Failure";
+  targetId?: string | null;
+  targetType?: string | null;
+  originalValue?: Record<string, any> | string | null;
+  modifiedValue?: Record<string, any> | string | null;
+  reason?: string | null;
+  metadata?: Record<string, any>;
 }
 
 export type ActivityAvailabilityStatus = "OPEN" | "CLOSED" | "COMING SOON" | "UPCOMING";
@@ -98,14 +105,6 @@ export const INITIAL_ASSIGNMENTS: ActivityAssignment[] = [
   {
     id: "act-2",
     activityName: "General Quiz",
-    assignedObId: null,
-    assignedObName: null,
-    department: null,
-    assignmentStatus: "Unassigned",
-  },
-  {
-    id: "act-3",
-    activityName: "Technical Games",
     assignedObId: null,
     assignedObName: null,
     department: null,
