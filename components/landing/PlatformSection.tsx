@@ -7,52 +7,46 @@ import {
   Boxes,
   Activity,
   Megaphone,
-  BookOpen,
   Users,
   ArrowRight,
 } from "lucide-react";
 
-const PLATFORM_MODULES = [
+interface PlatformModule {
+  title: string;
+  description: string;
+  href: string;
+  icon: React.ReactNode;
+}
+
+const PLATFORM_MODULES: PlatformModule[] = [
   {
-    title: "Events Module",
-    category: "MODULE 02",
+    title: "Events",
     description: "Access upcoming hackathons, tech talks, workshops, and campus meetups.",
-    href: "/events",
+    href: "https://microsoft-campus-club-webpage.vercel.app/students-corner",
     icon: <Calendar className="w-5 h-5 text-[#0078D4]" />,
   },
   {
     title: "Clubs Ecosystem",
-    category: "MODULE 03",
     description: "Explore technical wings including AI, Web Dev, Cloud Architecture, and Security.",
-    href: "/clubs",
+    href: "https://mcc-about-us-page.vercel.app/",
     icon: <Boxes className="w-5 h-5 text-[#22D3EE]" />,
   },
   {
     title: "Student Activities",
-    category: "MODULE 04",
     description: "Participate in coding challenges, project showcases, and team initiatives.",
-    href: "/activities",
+    href: "https://microsoft-campus-club-webpage.vercel.app/students-corner",
     icon: <Activity className="w-5 h-5 text-[#0078D4]" />,
   },
   {
     title: "Announcements",
-    category: "MODULE 05",
     description: "Official notifications, club guidelines, updates, and schedule releases.",
     href: "/announcements",
     icon: <Megaphone className="w-5 h-5 text-[#22D3EE]" />,
   },
   {
-    title: "Resource Hub",
-    category: "MODULE 06",
-    description: "Central repository of learning materials, dev kits, and recorded sessions.",
-    href: "/resources",
-    icon: <BookOpen className="w-5 h-5 text-[#0078D4]" />,
-  },
-  {
     title: "Member Directory",
-    category: "MODULE 07",
     description: "Connect with fellow club members, leads, mentors, and office bearers.",
-    href: "/members",
+    href: "https://mcc-about-us-page.vercel.app/",
     icon: <Users className="w-5 h-5 text-[#22D3EE]" />,
   },
 ];
@@ -75,13 +69,10 @@ export const PlatformSection: React.FC = () => {
               className="group p-6 rounded-xl bg-[#0D1B2A] border border-white/10 hover:border-[#0078D4]/40 transition-all duration-200 hover:-translate-y-0.5 flex flex-col justify-between"
             >
               <div>
-                <div className="flex items-center justify-between mb-4">
+                <div className="flex items-center mb-4">
                   <div className="p-2.5 rounded-lg bg-[#122438] border border-white/5">
                     {mod.icon}
                   </div>
-                  <span className="text-[11px] font-mono text-[#94A3B8] uppercase tracking-wider">
-                    {mod.category}
-                  </span>
                 </div>
                 <h3 className="text-lg font-semibold text-[#F8FAFC] group-hover:text-[#0078D4] transition-colors mb-2">
                   {mod.title}
