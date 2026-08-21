@@ -103,6 +103,7 @@ const ProposalSchema = new Schema(
     questionsDetected: { type: Number, default: null },
     csvFileName: { type: String, default: null },
     details: { type: String, default: "" },
+    questions: { type: Schema.Types.Mixed, default: [] },
     // Feed specific metadata
     mediaType: { type: String, enum: ["none", "image", "video", "IMAGE", "VIDEO"], default: "none" },
     mediaUrl: { type: String, default: null },

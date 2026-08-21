@@ -156,7 +156,9 @@ export async function POST(req: Request) {
 
     if (activeProposal) {
       if (activeProposal.title) testTitle = activeProposal.title;
-      if (activeProposal.details) {
+      if (Array.isArray(activeProposal.questions) && activeProposal.questions.length > 0) {
+        questionList = activeProposal.questions;
+      } else if (activeProposal.details) {
         try {
           const parsed = JSON.parse(activeProposal.details);
           if (Array.isArray(parsed) && parsed.length > 0 && parsed[0].correctAnswer) {

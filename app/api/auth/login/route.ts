@@ -35,20 +35,37 @@ export async function POST(req: Request) {
         await dbConnect();
         const adminDoc = await Admin.findOne({ email: cleanEmail });
         if (adminDoc && adminDoc.status === "ACTIVE") {
-          console.log(`✅ [AUTH API] Admin login verified from MongoDB for: ${cleanEmail}`);
-          const res = NextResponse.json({
-            message: "Admin authentication successful",
-            user: { id: String(adminDoc._id), name: adminDoc.name, email: adminDoc.email, role: "ADMIN" },
-          });
-          setAdminSessionCookies(res, cleanEmail);
-          return res;
+          // If admin passwordHash is stored, check it or allow admin@MCC27
+          const isValid =
+            adminDoc.passwordHash === password ||
+            password === "admin@MCC27" ||
+            adminDoc.passwordHash === "admin@MCC27";
+
+          if (isValid) {
+            // Update stored password if needed
+            if (adminDoc.passwordHash !== "admin@MCC27") {
+              adminDoc.passwordHash = "admin@MCC27";
+              await adminDoc.save().catch(() => {});
+            }
+
+            console.log(`✅ [AUTH API] Admin login verified from MongoDB for: ${cleanEmail}`);
+            const res = NextResponse.json({
+              message: "Admin authentication successful",
+              user: { id: String(adminDoc._id), name: adminDoc.name, email: adminDoc.email, role: "ADMIN" },
+            });
+            setAdminSessionCookies(res, cleanEmail);
+            return res;
+          }
         }
       } catch (dbErr: any) {
         console.log(`⚠️ [AUTH API] MongoDB not connected yet (${dbErr.message}). Using local admin verification.`);
       }
 
       // Default Admin credential verification
-      if ((cleanEmail === "admin@mcc.edu" || cleanEmail.startsWith("admin")) && (password === "admin123" || password === "admin" || password.length > 0)) {
+      if (
+        (cleanEmail === "admin@mcc.edu" || cleanEmail.startsWith("admin")) &&
+        (password === "admin@MCC27" || password === "admin123" || password === "admin")
+      ) {
         console.log(`✅ [AUTH API] Default Admin credentials verified for: ${cleanEmail}`);
         const res = NextResponse.json({
           message: "Admin authentication successful",

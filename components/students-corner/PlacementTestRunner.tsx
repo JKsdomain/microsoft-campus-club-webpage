@@ -27,6 +27,9 @@ interface PlacementTestRunnerProps {
   studentInfo?: StudentInfo;
   username?: string;
   email?: string;
+  customQuestions?: { id: string; question: string; options: string[] }[];
+  timerMinutes?: number;
+  testTitle?: string;
   onFinishTest: (report: StudentResultReport) => void;
 }
 
@@ -36,6 +39,9 @@ export const PlacementTestRunner: React.FC<PlacementTestRunnerProps> = ({
   studentInfo,
   username,
   email,
+  customQuestions,
+  timerMinutes,
+  testTitle,
   onFinishTest,
 }) => {
   const effectiveStudentInfo: StudentInfo = studentInfo || {
@@ -52,7 +58,7 @@ export const PlacementTestRunner: React.FC<PlacementTestRunnerProps> = ({
   const [currentIdx, setCurrentIdx] = useState(0);
   const [userAnswers, setUserAnswers] = useState<Record<string, string>>({});
   const [timeLeftSeconds, setTimeLeftSeconds] = useState(
-    ACTIVE_PLACEMENT_SET.timerMinutes * 60
+    (timerMinutes || ACTIVE_PLACEMENT_SET.timerMinutes) * 60
   );
   const [report, setReport] = useState<StudentResultReport | null>(null);
 
@@ -63,7 +69,9 @@ export const PlacementTestRunner: React.FC<PlacementTestRunnerProps> = ({
   const [isTerminated, setIsTerminated] = useState(false);
 
   const containerRef = useRef<HTMLDivElement>(null);
-  const publicQuestions = getPublicPlacementQuestions();
+  const publicQuestions = (customQuestions && Array.isArray(customQuestions) && customQuestions.length > 0)
+    ? customQuestions
+    : getPublicPlacementQuestions();
 
   // Helper to record security violation
   const recordViolation = (type: string, message: string) => {

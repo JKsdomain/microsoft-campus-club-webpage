@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 import { cookies } from "next/headers";
 import { dbConnect } from "@/lib/db/dbConnect";
 import { ProposalModel, OfficeBearer, AuditLog } from "@/lib/db/models";
+import { getAuthenticatedUser } from "@/lib/authHelper";
 import mongoose from "mongoose";
 
 // GET /api/admin/proposals
@@ -41,6 +42,7 @@ export async function GET() {
           : new Date().toISOString().replace("T", " ").substring(0, 16),
         status: statusMap[p.status] || p.status,
         details: p.details || "",
+        questions: Array.isArray(p.questions) ? p.questions : [],
         // Quiz-specific metadata
         questionsToUpload: p.questionsToUpload,
         questionsToDisplay: p.questionsToDisplay,
@@ -90,6 +92,7 @@ export async function POST(req: Request) {
       authorDepartment,
       content,
       details,
+      questions,
       questionsToUpload,
       questionsToDisplay,
       randomQuestions,
@@ -169,6 +172,7 @@ export async function POST(req: Request) {
       questionsDetected,
       csvFileName,
       details: finalDetails,
+      questions: Array.isArray(questions) ? questions : [],
       // Feed-specific metadata
       mediaType: mediaType || "none",
       mediaUrl: mediaUrl || null,
@@ -196,7 +200,7 @@ export async function POST(req: Request) {
         submittedBy,
         authorDepartment,
         timerMinutes: proposal.timerMinutes,
-        questionsCount: proposal.questionsDetected || 0,
+        questionsCount: proposal.questionsDetected || (Array.isArray(questions) ? questions.length : 0),
       },
       metadata: { submittedBy, type: dbType },
     });
@@ -219,6 +223,7 @@ export async function POST(req: Request) {
       submittedDate: new Date(proposal.submittedAt).toISOString().replace("T", " ").substring(0, 16),
       status: "Pending Approval",
       details: proposal.details,
+      questions: proposal.questions || [],
       questionsToUpload: proposal.questionsToUpload,
       questionsToDisplay: proposal.questionsToDisplay,
       randomQuestions: proposal.randomQuestions,
@@ -338,69 +343,44 @@ export async function PUT(req: Request) {
       }, { status: 201 });
     }
 
-    // ----- ARCHIVE PLACEMENT QUIZ OR PROPOSAL (Issue 16) -----
+    // ----- ARCHIVE PLACEMENT QUIZ OR PROPOSAL (Issue 16 & 1) -----
     if (action === "archive") {
       const cookieStore = await cookies();
-      const adminCookie = cookieStore.get("mcc_admin_session");
-      const obCookie = cookieStore.get("mcc_ob_session");
+      const authUser = await getAuthenticatedUser(cookieStore);
 
-      let isAdmin = false;
-      let isAuthorizedOB = false;
-      let actorName = "Administrator";
-      let actorEmail = "";
-
-      if (adminCookie?.value) {
-        try {
-          const session = JSON.parse(adminCookie.value);
-          if (session.role === "ADMIN") {
-            isAdmin = true;
-            actorName = session.email?.split("@")[0] || "Administrator";
-            actorEmail = session.email || "";
-          }
-        } catch {}
+      if (!authUser) {
+        return NextResponse.json(
+          { message: "Unauthorized. Please log in to archive activities." },
+          { status: 401 }
+        );
       }
 
-      let currentOb: any = null;
-      if (!isAdmin && obCookie?.value) {
-        try {
-          const session = JSON.parse(obCookie.value);
-          if (session.email) {
-            currentOb = await OfficeBearer.findOne({
-              email: session.email.toLowerCase(),
-              status: "ACTIVE",
-            }).populate("responsibilityId");
-            if (currentOb) {
-              actorName = currentOb.name;
-              actorEmail = currentOb.email;
-            }
-          }
-        } catch {}
-      }
+      const isAdmin = authUser.role === "ADMIN";
+      let isAuthorized = isAdmin;
 
-      if (isAdmin) {
-        isAuthorizedOB = true;
-      } else if (currentOb) {
-        const hasPlacementResp =
-          currentOb.responsibilityId &&
-          currentOb.responsibilityId.name === "Placement Questions";
+      if (!isAuthorized && authUser.role === "OFFICE_BEARER") {
+        const respName = authUser.responsibility || "";
+        const isPlacementLead = respName.toLowerCase().includes("placement");
         const isAuthor =
-          proposal.submittedBy === currentOb.name ||
-          (proposal as any).authorEmail === currentOb.email;
+          proposal.submittedBy === authUser.name ||
+          (proposal as any).authorEmail === authUser.email;
 
-        if (
-          proposal.type === "PLACEMENT_QUESTIONS" &&
-          (hasPlacementResp || isAuthor)
-        ) {
-          isAuthorizedOB = true;
+        if (proposal.type === "PLACEMENT_QUESTIONS" && (isPlacementLead || isAuthor)) {
+          isAuthorized = true;
+        } else if (isAuthor) {
+          isAuthorized = true;
         }
       }
 
-      if (!isAuthorizedOB) {
+      if (!isAuthorized) {
         return NextResponse.json(
           { message: "Forbidden. You are not authorized to archive this activity." },
           { status: 403 }
         );
       }
+
+      const actorName = authUser.name || (isAdmin ? "Administrator" : "Office Bearer");
+      const actorEmail = authUser.email || "";
 
       const previousStatus = proposal.status;
       proposal.status = "ARCHIVED";

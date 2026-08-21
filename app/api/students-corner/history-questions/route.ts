@@ -19,7 +19,32 @@ export async function GET() {
     let bannerNotice: string | null = null;
     let activeExpiresAt: string | null = null;
 
-    const historySets: HistorySet[] = proposals.map((p: any, idx: number) => {
+    // Filter proposals:
+    // 1. Must be ARCHIVED or have concluded its scheduled test timeline (endAt <= now)
+    // 2. Must contain real uploaded questions
+    const eligibleProposals = proposals.filter((p: any) => {
+      // Must be archived or test timeline completed
+      const isArchived = p.status === "ARCHIVED";
+      const isPastTimeline = p.endAt ? new Date(p.endAt).getTime() <= now.getTime() : isArchived;
+      if (!isArchived && !isPastTimeline) {
+        return false;
+      }
+
+      // Check if real questions exist
+      if (Array.isArray(p.questions) && p.questions.length > 0) {
+        return true;
+      }
+      if (p.details && (p.details.startsWith("[") || p.details.startsWith("{"))) {
+        try {
+          const parsed = JSON.parse(p.details);
+          if (Array.isArray(parsed) && parsed.length > 0) return true;
+          if (Array.isArray(parsed.questions) && parsed.questions.length > 0) return true;
+        } catch {}
+      }
+      return false;
+    });
+
+    const historySets: HistorySet[] = eligibleProposals.map((p: any, idx: number) => {
       const publishedDateObj = p.reviewedAt || p.submittedAt || p.createdAt || now;
       const publishedDateStr = new Date(publishedDateObj).toISOString().split("T")[0];
 
@@ -34,27 +59,24 @@ export async function GET() {
         bannerNotice = `📌 Notice: Placement history questions remain active for 1 month from publication. Current question set active until: ${expiryDateStr}.`;
       }
 
-      // Extract questions from proposal details
+      // Extract real questions
       let parsedQuestions: TestQuestion[] = [];
-      try {
-        if (p.details && (p.details.startsWith("[") || p.details.startsWith("{"))) {
+      if (Array.isArray(p.questions) && p.questions.length > 0) {
+        parsedQuestions = p.questions;
+      } else if (p.details) {
+        try {
           const parsed = JSON.parse(p.details);
           if (Array.isArray(parsed)) {
             parsedQuestions = parsed;
           } else if (Array.isArray(parsed.questions)) {
             parsedQuestions = parsed.questions;
           }
-        }
-      } catch {}
-
-      // If details was a plain text description, fallback to the standard active placement set questions
-      if (parsedQuestions.length === 0) {
-        parsedQuestions = ACTIVE_PLACEMENT_SET.questions;
+        } catch {}
       }
 
       return {
         id: String(p._id),
-        weekName: p.title || `Placement Questions — Set #${proposals.length - idx}`,
+        weekName: p.title || `Placement Questions — Set #${eligibleProposals.length - idx}`,
         title: p.title || "Placement Preparation & Technical Assessment",
         completedDate: publishedDateStr,
         questionCount: parsedQuestions.length,

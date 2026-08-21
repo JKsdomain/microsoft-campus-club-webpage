@@ -78,6 +78,7 @@ export const OBAuthProvider: React.FC<{ children: React.ReactNode }> = ({ childr
               parentId: p.parentId || null,
               startAt: p.startAt || null,
               endAt: p.endAt || null,
+              questions: Array.isArray(p.questions) ? p.questions : [],
             }));
           setSubmissions(mappedQuiz);
 
@@ -195,7 +196,7 @@ export const OBAuthProvider: React.FC<{ children: React.ReactNode }> = ({ childr
           type: data.type,
           title: data.title,
           submittedBy: currentOb.name,
-          authorDepartment: currentOb.department,
+          questions: (data as any).questions || [],
           questionsToUpload: data.questionsToUpload,
           questionsToDisplay: data.questionsToDisplay,
           randomQuestions: data.randomQuestions,
@@ -227,6 +228,7 @@ export const OBAuthProvider: React.FC<{ children: React.ReactNode }> = ({ childr
             csvFileName: data.csvFileName,
             startAt: result.proposal.startAt || data.startAt,
             endAt: result.proposal.endAt || data.endAt,
+            questions: result.proposal.questions || (data as any).questions || [],
           };
           setSubmissions((prev) => [newSub, ...prev]);
           console.log(`✅ [MONGODB] Quiz Proposal submitted: ${result.proposal.id}`);

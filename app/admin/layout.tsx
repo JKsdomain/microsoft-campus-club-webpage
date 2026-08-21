@@ -57,6 +57,8 @@ function AdminLayoutInner({ children }: { children: React.ReactNode }) {
         return "Announcements";
       case "/admin/audit-logs":
         return "Audit & Logs";
+      case "/admin/data-cleanup":
+        return "Data Cleanup & System Reset";
       default:
         return "Admin Panel";
     }

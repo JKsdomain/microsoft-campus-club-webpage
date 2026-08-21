@@ -56,10 +56,12 @@ export async function initDatabaseDefaults() {
   await Admin.updateOne(
     { email: "admin@mcc.edu" },
     {
+      $set: {
+        passwordHash: "admin@MCC27",
+      },
       $setOnInsert: {
         name: "Administrator",
         email: "admin@mcc.edu",
-        passwordHash: "admin123", // Secure hash placeholder
         role: "ADMIN",
         status: "ACTIVE",
       },

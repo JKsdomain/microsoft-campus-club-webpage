@@ -59,6 +59,34 @@ export const QuizConfiguration: React.FC<QuizConfigurationProps> = ({
     return <UnauthorizedGuard activityName={activityType} />;
   }
 
+  // Structured questions parsed from CSV
+  const [uploadedQuestions, setUploadedQuestions] = useState<any[]>([]);
+
+  // CSV Row Parser helper handling quotes and commas
+  const parseCSVRow = (text: string): string[] => {
+    const result: string[] = [];
+    let cur = "";
+    let inQuotes = false;
+    for (let i = 0; i < text.length; i++) {
+      const c = text[i];
+      if (c === '"') {
+        if (inQuotes && text[i + 1] === '"') {
+          cur += '"';
+          i++;
+        } else {
+          inQuotes = !inQuotes;
+        }
+      } else if (c === "," && !inQuotes) {
+        result.push(cur.trim());
+        cur = "";
+      } else {
+        cur += c;
+      }
+    }
+    result.push(cur.trim());
+    return result;
+  };
+
   // Simulated File Upload & CSV Parsing Validation
   const handleFileUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
@@ -71,6 +99,7 @@ export const QuizConfiguration: React.FC<QuizConfigurationProps> = ({
       setValidationError("Invalid file type. Please upload a valid CSV file (.csv).");
       setCsvFileName(null);
       setCsvQuestionsCount(null);
+      setUploadedQuestions([]);
       setIsValidated(false);
       return;
     }
@@ -102,9 +131,34 @@ export const QuizConfiguration: React.FC<QuizConfigurationProps> = ({
         return;
       }
 
-      const detectedCount = lines.length - 1;
+      // Parse structured questions from all data rows
+      const parsedList: any[] = [];
+      for (let i = 1; i < lines.length; i++) {
+        const line = lines[i].trim();
+        if (!line) continue;
+        const cols = parseCSVRow(line);
+        if (cols.length >= 6) {
+          const qText = cols[0];
+          const choice1 = cols[1];
+          const choice2 = cols[2];
+          const choice3 = cols[3] || "N/A";
+          const choice4 = cols[4] || "N/A";
+          const answer = cols[5] || choice1;
+          const explanation = cols[6] || `Standard technical assessment explanation for question ${parsedList.length + 1}.`;
+          parsedList.push({
+            id: `q${parsedList.length + 1}`,
+            question: qText,
+            options: [choice1, choice2, choice3, choice4],
+            correctAnswer: answer,
+            explanation,
+          });
+        }
+      }
+
+      const detectedCount = parsedList.length || (lines.length - 1);
       setCsvQuestionsCount(detectedCount);
       setCsvFileName(file.name);
+      setUploadedQuestions(parsedList);
 
       // Validate questions count vs specified upload count & display limit
       if (detectedCount !== questionsToUpload) {
@@ -129,7 +183,23 @@ export const QuizConfiguration: React.FC<QuizConfigurationProps> = ({
   // Preset sample CSV loader for easy testing
   const handleLoadSampleCSV = () => {
     setValidationError(null);
-    const sampleCount = questionsToUpload;
+    const sampleCount = questionsToUpload || 6;
+    const sampleQuestions: any[] = [];
+    for (let i = 1; i <= sampleCount; i++) {
+      sampleQuestions.push({
+        id: `q${i}`,
+        question: `Sample Technical Question #${i}: Core Assessment Assessment Topic ${i}?`,
+        options: [
+          `Option A for Question ${i}`,
+          `Option B for Question ${i} (Correct)`,
+          `Option C for Question ${i}`,
+          `Option D for Question ${i}`,
+        ],
+        correctAnswer: `Option B for Question ${i} (Correct)`,
+        explanation: `Detailed explanation and technical rationale for Question #${i}.`,
+      });
+    }
+    setUploadedQuestions(sampleQuestions);
     setCsvQuestionsCount(sampleCount);
     setCsvFileName(`${activityType.toLowerCase().replace(" ", "_")}_sample.csv`);
     setIsValidated(true);
@@ -169,6 +239,7 @@ export const QuizConfiguration: React.FC<QuizConfigurationProps> = ({
     submitQuizProposal({
       type: activityType,
       title: title || `${activityType} Submission`,
+      questions: uploadedQuestions,
       questionsToUpload,
       questionsToDisplay,
       randomQuestions,

@@ -2,10 +2,10 @@ import { NextResponse } from "next/server";
 import { cookies } from "next/headers";
 import { dbConnect } from "@/lib/db/dbConnect";
 import { LeaderboardWeek, TestAttempt, Admin, OfficeBearer, AuditLog } from "@/lib/db/models";
+import { getAuthenticatedUser } from "@/lib/authHelper";
 
 // GET /api/leaderboard
 // Returns leaderboard publication state and calculated rankings from MongoDB TestAttempts strictly for PLACEMENT QUESTIONS.
-// If unpublished, returns { isPublished: false, message: "Leaderboard will be available once it is published.", entries: [] }
 export async function GET() {
   try {
     await dbConnect();
@@ -13,9 +13,10 @@ export async function GET() {
     // 1. Query current LeaderboardWeek document for Placement Questions
     let weekDoc = await LeaderboardWeek.findOne({
       activityType: { $in: ["PLACEMENT_QUESTIONS", "Placement Questions", "ALL"] }
-    }).sort({ createdAt: -1 });
+    }).sort({ weekNumber: -1, createdAt: -1 });
 
     const isPublished = Boolean(weekDoc?.isPublished || weekDoc?.status === "PUBLISHED");
+    const currentWeekNumber = weekDoc?.weekNumber || 1;
 
     // 2. Calculate rankings from persisted MongoDB TestAttempt documents strictly for Placement Questions
     const attempts = await TestAttempt.find({
@@ -73,7 +74,7 @@ export async function GET() {
         publishedAt: null,
         publishedBy: null,
         publishedByRole: null,
-        weekNumber: weekDoc?.weekNumber || 1,
+        weekNumber: currentWeekNumber,
         activityType: "Placement Questions",
       });
     }
@@ -84,7 +85,7 @@ export async function GET() {
       publishedBy: weekDoc?.publishedBy || null,
       publishedByRole: weekDoc?.publishedByRole || null,
       entries,
-      weekNumber: weekDoc?.weekNumber || 1,
+      weekNumber: currentWeekNumber,
       activityType: "Placement Questions",
     });
   } catch (error: any) {
@@ -97,11 +98,7 @@ export async function GET() {
 }
 
 // POST /api/leaderboard
-// Body: { action: "publish" | "unpublish" }
-// Server-side authenticated publish control:
-// - Admin: Allowed to publish/unpublish.
-// - Responsible OB: Allowed ONLY if assigned to "Placement Questions".
-// - Any other OB: Rejected with HTTP 403.
+// Body: { action: "publish" | "unpublish" | "reset" }
 export async function POST(req: Request) {
   try {
     await dbConnect();
@@ -110,61 +107,82 @@ export async function POST(req: Request) {
 
     // 1. Authenticate Requester Session
     const cookieStore = await cookies();
-    const adminSession = cookieStore.get("mcc_admin_session")?.value;
-    const obSession = cookieStore.get("mcc_ob_session")?.value;
+    const authUser = await getAuthenticatedUser(cookieStore);
 
-    let role: "ADMIN" | "OFFICE_BEARER" | null = null;
-    let actorName = "";
-    let actorEmail = "";
-    let obResponsibility = "";
-
-    if (adminSession) {
-      role = "ADMIN";
-      const cleanEmail = decodeURIComponent(adminSession).trim().toLowerCase();
-      actorEmail = cleanEmail;
-      actorName = "Administrator";
-
-      const adminDoc = await Admin.findOne({ email: cleanEmail, status: "ACTIVE" });
-      if (adminDoc) {
-        actorName = adminDoc.name;
-      }
-    } else if (obSession) {
-      role = "OFFICE_BEARER";
-      const cleanEmail = decodeURIComponent(obSession).trim().toLowerCase();
-      actorEmail = cleanEmail;
-      actorName = "Office Bearer";
-
-      const obDoc = await OfficeBearer.findOne({ email: cleanEmail, status: "ACTIVE" }).populate("responsibilityId");
-      if (obDoc) {
-        actorName = obDoc.name;
-        obResponsibility = obDoc.responsibilityId ? (obDoc.responsibilityId as any).name : "Unassigned";
-      }
-    }
-
-    if (!role) {
+    if (!authUser) {
       return NextResponse.json(
         { message: "Unauthorized. You must be logged in as an Administrator or Placement Office Bearer to perform this action." },
         { status: 401 }
       );
     }
 
-    // 2. Server-Side Authorization Check: STRICTLY PLACEMENT QUESTIONS ONLY
+    const role = authUser.role;
+    const actorName = authUser.name;
+    const actorEmail = authUser.email;
+    const obResponsibility = authUser.responsibility || "";
+
+    // 2. Server-Side Authorization Check
     if (role === "OFFICE_BEARER") {
       const normalizedResp = obResponsibility.toLowerCase().replace(/_/g, " ").trim();
       if (!normalizedResp.includes("placement")) {
         return NextResponse.json(
           {
-            message: `Unauthorized: Office Bearer assigned to "${obResponsibility}" cannot publish the Placement Questions leaderboard. Only the Placement Questions OB or Admin is authorized.`,
+            message: `Unauthorized: Office Bearer assigned to "${obResponsibility}" cannot manage the Placement Questions leaderboard. Only the Placement Questions OB or Admin is authorized.`,
           },
           { status: 403 }
         );
       }
     }
 
-    // 3. Update or Create MongoDB LeaderboardWeek Document
+    // 3. Handle Reset action
+    if (action === "reset") {
+      let weekDoc = await LeaderboardWeek.findOne({
+        activityType: { $in: ["PLACEMENT_QUESTIONS", "Placement Questions", "ALL"] }
+      }).sort({ weekNumber: -1, createdAt: -1 });
+
+      const newWeekNumber = weekDoc ? (weekDoc.weekNumber + 1) : 1;
+
+      // Create fresh week record
+      const newWeek = await LeaderboardWeek.create({
+        weekNumber: newWeekNumber,
+        activityType: "PLACEMENT_QUESTIONS",
+        startDate: new Date(),
+        endDate: new Date(Date.now() + 7 * 24 * 60 * 60 * 1000),
+        status: "UNPUBLISHED",
+        isPublished: false,
+      });
+
+      await AuditLog.create({
+        actorId: actorEmail || null,
+        actorType: role,
+        actorName,
+        actorEmail: actorEmail || undefined,
+        role: role === "ADMIN" ? "Administrator" : "Office Bearer",
+        action: "LEADERBOARD_RESET",
+        module: "Leaderboard",
+        targetId: newWeek._id,
+        targetType: "LEADERBOARD_WEEK",
+        metadata: {
+          newWeekNumber,
+          resetBy: actorName,
+          timestamp: new Date(),
+        },
+      });
+
+      console.log(`🔄 [MONGODB ATLAS] Leaderboard reset to Week ${newWeekNumber} by ${actorName}`);
+
+      return NextResponse.json({
+        success: true,
+        message: `Leaderboard reset for new round (Week ${newWeekNumber}).`,
+        isPublished: false,
+        weekNumber: newWeekNumber,
+      });
+    }
+
+    // 4. Update or Create MongoDB LeaderboardWeek Document
     let weekDoc = await LeaderboardWeek.findOne({
       activityType: { $in: ["PLACEMENT_QUESTIONS", "Placement Questions", "ALL"] }
-    }).sort({ createdAt: -1 });
+    }).sort({ weekNumber: -1, createdAt: -1 });
 
     if (!weekDoc) {
       weekDoc = new LeaderboardWeek({
@@ -185,7 +203,7 @@ export async function POST(req: Request) {
     weekDoc.publishedByRole = isPub ? role : null;
     await weekDoc.save();
 
-    // 4. Create AuditLog Record
+    // 5. Create AuditLog Record
     await AuditLog.create({
       actorId: actorEmail || null,
       actorType: role,

@@ -105,10 +105,22 @@ export async function POST(req: Request) {
 
       // If active proposal exists, return its details
       if (activeProposal) {
+        const publicQuestions = (activeProposal.questions && Array.isArray(activeProposal.questions) && activeProposal.questions.length > 0)
+          ? activeProposal.questions.map((q: any) => ({
+              id: q.id,
+              question: q.question,
+              options: q.options || [],
+            }))
+          : null;
+
         return NextResponse.json({
           allowed: true,
           status: "OPEN",
           activityId: logicalActivityId,
+          testTitle: activeProposal.title || (activityName === "Placement Questions" ? "Placement Assessment" : "General Quiz Challenge"),
+          timerMinutes: activeProposal.timerMinutes || 30,
+          totalQuestions: activeProposal.questionsToDisplay || (publicQuestions ? publicQuestions.length : 4),
+          questions: publicQuestions,
           startAt: activeProposal.startAt ? new Date(activeProposal.startAt).toISOString() : null,
           endAt: activeProposal.endAt ? new Date(activeProposal.endAt).toISOString() : null,
         });

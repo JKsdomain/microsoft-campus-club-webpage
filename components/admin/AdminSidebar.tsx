@@ -10,6 +10,7 @@ import {
   CheckCircle2,
   Megaphone,
   FileClock,
+  Trash2,
   LogOut,
   X,
 } from "lucide-react";
@@ -22,6 +23,7 @@ const ADMIN_NAV_ITEMS = [
   { label: "Approval Workflow", href: "/admin/approvals", icon: CheckCircle2 },
   { label: "Announcements", href: "/admin/announcements", icon: Megaphone },
   { label: "Audit & Logs", href: "/admin/audit-logs", icon: FileClock },
+  { label: "Data Cleanup", href: "/admin/data-cleanup", icon: Trash2 },
 ];
 
 interface AdminSidebarProps {

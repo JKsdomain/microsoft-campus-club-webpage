@@ -26,6 +26,7 @@ export interface QuizSubmission {
   parentId?: string | null;
   startAt?: string | null;
   endAt?: string | null;
+  questions?: any[];
 }
 
 export interface FeedPostItem {

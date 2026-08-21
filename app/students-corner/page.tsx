@@ -137,6 +137,13 @@ function StudentsCornerInner() {
     fetchLeaderboardData();
   }, [activeTab]);
 
+  const [currentEventData, setCurrentEventData] = React.useState<{
+    testTitle?: string;
+    timerMinutes?: number;
+    totalQuestions?: number;
+    questions?: any[];
+  } | null>(null);
+
   const handleStartTestFlow = async (testType: "Placement Questions" | "General Quiz") => {
     // 1. Live backend verification from MongoDB
     try {
@@ -150,6 +157,14 @@ function StudentsCornerInner() {
         setBlockedMessage(data.message || `"${testType}" is currently closed by the administrator.`);
         setActivityAvailability((prev) => ({ ...prev, [testType]: data.status || "CLOSED" }));
         return;
+      }
+      if (data.questions || data.testTitle || data.timerMinutes) {
+        setCurrentEventData({
+          testTitle: data.testTitle,
+          timerMinutes: data.timerMinutes,
+          totalQuestions: data.totalQuestions,
+          questions: data.questions,
+        });
       }
     } catch (err) {
       console.error("Availability validation network error:", err);
@@ -543,6 +558,9 @@ function StudentsCornerInner() {
             ) : (
               <PlacementTestRunner
                 studentInfo={studentInfo}
+                customQuestions={currentEventData?.questions}
+                timerMinutes={currentEventData?.timerMinutes}
+                testTitle={currentEventData?.testTitle}
                 onFinishTest={handleTestFinished}
               />
             )}

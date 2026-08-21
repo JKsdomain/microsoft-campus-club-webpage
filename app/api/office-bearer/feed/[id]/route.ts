@@ -3,6 +3,7 @@ import { cookies } from "next/headers";
 import { dbConnect } from "@/lib/db/dbConnect";
 import { ProposalModel, OfficeBearer, AuditLog } from "@/lib/db/models";
 import { deleteFromCloudinary } from "@/lib/cloudinary";
+import { getAuthenticatedUser } from "@/lib/authHelper";
 
 // DELETE /api/office-bearer/feed/[id]
 // Authenticates user, enforces authorization (Admin or Author OB), performs safe Cloudinary asset deletion,
@@ -20,55 +21,18 @@ export async function DELETE(
     }
 
     const cookieStore = await cookies();
-    const adminSessionCookie = cookieStore.get("mcc_admin_session");
-    const obSessionCookie = cookieStore.get("mcc_ob_session");
+    const authUser = await getAuthenticatedUser(cookieStore);
 
-    let isAdmin = false;
-    let isAuthorizedOB = false;
-    let actorName = "Unknown";
-    let actorEmail = "";
-
-    // 1. Verify Admin Session
-    if (adminSessionCookie && adminSessionCookie.value) {
-      try {
-        const sessionData = JSON.parse(adminSessionCookie.value);
-        if (sessionData.role === "ADMIN") {
-          isAdmin = true;
-          actorName = sessionData.email?.split("@")[0] || "Admin";
-          actorEmail = sessionData.email || "";
-        }
-      } catch {
-        // invalid cookie json
-      }
-    }
-
-    // 2. Verify OB Session if not Admin
-    let currentOB: any = null;
-    if (!isAdmin && obSessionCookie && obSessionCookie.value) {
-      try {
-        const sessionData = JSON.parse(obSessionCookie.value);
-        if (sessionData.email) {
-          currentOB = await OfficeBearer.findOne({
-            email: sessionData.email.toLowerCase(),
-            status: "ACTIVE",
-          }).populate("responsibilityId");
-
-          if (currentOB) {
-            actorName = currentOB.name;
-            actorEmail = currentOB.email;
-          }
-        }
-      } catch {
-        // invalid cookie json
-      }
-    }
-
-    if (!isAdmin && !currentOB) {
+    if (!authUser) {
       return NextResponse.json(
         { message: "Unauthorized. Please log in to manage feed posts." },
         { status: 401 }
       );
     }
+
+    const isAdmin = authUser.role === "ADMIN";
+    const actorName = authUser.name || (isAdmin ? "Admin" : "Office Bearer");
+    const actorEmail = authUser.email || "";
 
     // 3. Find the Feed Post Proposal in MongoDB
     const proposal = await ProposalModel.findById(id);
@@ -80,20 +44,20 @@ export async function DELETE(
     }
 
     // 4. Enforce Authorization
-    if (isAdmin) {
-      isAuthorizedOB = true;
-    } else if (currentOB) {
+    let isAuthorized = isAdmin;
+    if (!isAuthorized && authUser.role === "OFFICE_BEARER") {
+      const respName = (authUser.responsibility || "").toLowerCase();
+      const isFeedLead = respName.includes("feed");
       const isAuthor =
-        proposal.submittedBy === currentOB.name ||
-        (proposal as any).authorEmail === currentOB.email ||
-        (currentOB.responsibilityId && currentOB.responsibilityId.name === "Feed Community");
+        proposal.submittedBy === authUser.name ||
+        (proposal as any).authorEmail === authUser.email;
 
-      if (isAuthor) {
-        isAuthorizedOB = true;
+      if (isFeedLead || isAuthor) {
+        isAuthorized = true;
       }
     }
 
-    if (!isAuthorizedOB) {
+    if (!isAuthorized) {
       console.warn(`⛔ [UNAUTHORIZED FEED DELETE ATTEMPT] User "${actorName}" attempted to delete post "${proposal._id}" by "${proposal.submittedBy}"`);
       return NextResponse.json(
         { message: "Forbidden. You are not authorized to delete this feed post." },

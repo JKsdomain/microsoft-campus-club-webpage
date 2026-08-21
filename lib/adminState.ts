@@ -40,6 +40,10 @@ export interface Proposal {
   // Timeline fields (General Quiz & Placement Questions)
   startAt?: string | null;
   endAt?: string | null;
+  questions?: any[];
+  timerMinutes?: number;
+  questionsToUpload?: number;
+  questionsToDisplay?: number;
 }
 
 export interface AnnouncementPoster {

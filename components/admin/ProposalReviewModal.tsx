@@ -190,63 +190,77 @@ export const ProposalReviewModal: React.FC<ProposalReviewModalProps> = ({
               </div>
 
               <div className="p-5 rounded-xl bg-[#07111F] border border-white/10 space-y-4">
-                {proposal.type === "General Quiz" && (
-                  <div className="space-y-4 text-xs">
-                    <div className="p-3 rounded-lg bg-[#0D1B2A] border border-white/10 space-y-1">
-                      <h5 className="font-bold text-[#F8FAFC] text-sm">{proposal.title}</h5>
-                      <p className="text-[#94A3B8]">
-                        Configuration: 3 Questions • 15 Minutes • Randomization: Enabled
-                      </p>
-                    </div>
+                {proposal.type === "General Quiz" && (() => {
+                  const quizQuestions = (proposal.questions && proposal.questions.length > 0)
+                    ? proposal.questions
+                    : ACTIVE_QUIZ_SET.questions;
+                  return (
+                    <div className="space-y-4 text-xs">
+                      <div className="p-3 rounded-lg bg-[#0D1B2A] border border-white/10 space-y-1">
+                        <h5 className="font-bold text-[#F8FAFC] text-sm">{proposal.title}</h5>
+                        <p className="text-[#94A3B8]">
+                          Configuration: {quizQuestions.length} Questions • {proposal.timerMinutes || 15} Minutes • Randomization: Enabled
+                        </p>
+                      </div>
 
-                    <div className="space-y-3">
-                      {ACTIVE_QUIZ_SET.questions.map((q, idx) => (
-                        <div key={q.id} className="p-3 rounded-lg bg-[#0D1B2A]/60 border border-white/5 space-y-2">
-                          <span className="font-bold text-[#22D3EE]">Q{idx + 1}. {q.question}</span>
-                          <div className="pl-2 space-y-1 text-[#CBD5E1]">
-                            {q.options.map((opt, oIdx) => (
-                              <div key={oIdx} className={opt === q.correctAnswer ? "text-emerald-400 font-semibold" : ""}>
-                                {String.fromCharCode(65 + oIdx)}. {opt} {opt === q.correctAnswer && "✓ (Correct Answer)"}
-                              </div>
-                            ))}
+                      <div className="space-y-3">
+                        {quizQuestions.map((q: any, idx: number) => (
+                          <div key={q.id || idx} className="p-3 rounded-lg bg-[#0D1B2A]/60 border border-white/5 space-y-2">
+                            <span className="font-bold text-[#22D3EE]">Q{idx + 1}. {q.question}</span>
+                            <div className="pl-2 space-y-1 text-[#CBD5E1]">
+                              {(q.options || []).map((opt: string, oIdx: number) => (
+                                <div key={oIdx} className={opt === q.correctAnswer ? "text-emerald-400 font-semibold" : ""}>
+                                  {String.fromCharCode(65 + oIdx)}. {opt} {opt === q.correctAnswer && "✓ (Correct Answer)"}
+                                </div>
+                              ))}
+                            </div>
+                            {q.explanation && (
+                              <p className="text-[#94A3B8] pt-1 text-[11px]">
+                                <strong>Explanation:</strong> {q.explanation}
+                              </p>
+                            )}
                           </div>
-                          <p className="text-[#94A3B8] pt-1 text-[11px]">
-                            <strong>Explanation:</strong> {q.explanation}
-                          </p>
-                        </div>
-                      ))}
+                        ))}
+                      </div>
                     </div>
-                  </div>
-                )}
+                  );
+                })()}
 
-                {proposal.type === "Placement Questions" && (
-                  <div className="space-y-4 text-xs">
-                    <div className="p-3 rounded-lg bg-[#0D1B2A] border border-white/10 space-y-1">
-                      <h5 className="font-bold text-[#F8FAFC] text-sm">{proposal.title}</h5>
-                      <p className="text-[#94A3B8]">
-                        Configuration: 4 Questions • 30 Minutes • Secure Test Environment Required
-                      </p>
-                    </div>
+                {proposal.type === "Placement Questions" && (() => {
+                  const placementQuestions = (proposal.questions && proposal.questions.length > 0)
+                    ? proposal.questions
+                    : ACTIVE_PLACEMENT_SET.questions;
+                  return (
+                    <div className="space-y-4 text-xs">
+                      <div className="p-3 rounded-lg bg-[#0D1B2A] border border-white/10 space-y-1">
+                        <h5 className="font-bold text-[#F8FAFC] text-sm">{proposal.title}</h5>
+                        <p className="text-[#94A3B8]">
+                          Configuration: {placementQuestions.length} Questions • {proposal.timerMinutes || 30} Minutes • Secure Test Environment Required
+                        </p>
+                      </div>
 
-                    <div className="space-y-3">
-                      {ACTIVE_PLACEMENT_SET.questions.map((q, idx) => (
-                        <div key={q.id} className="p-3 rounded-lg bg-[#0D1B2A]/60 border border-white/5 space-y-2">
-                          <span className="font-bold text-[#22D3EE]">Q{idx + 1}. {q.question}</span>
-                          <div className="pl-2 space-y-1 text-[#CBD5E1]">
-                            {q.options.map((opt, oIdx) => (
-                              <div key={oIdx} className={opt === q.correctAnswer ? "text-emerald-400 font-semibold" : ""}>
-                                {String.fromCharCode(65 + oIdx)}. {opt} {opt === q.correctAnswer && "✓ (Correct Answer)"}
-                              </div>
-                            ))}
+                      <div className="space-y-3">
+                        {placementQuestions.map((q: any, idx: number) => (
+                          <div key={q.id || idx} className="p-3 rounded-lg bg-[#0D1B2A]/60 border border-white/5 space-y-2">
+                            <span className="font-bold text-[#22D3EE]">Q{idx + 1}. {q.question}</span>
+                            <div className="pl-2 space-y-1 text-[#CBD5E1]">
+                              {(q.options || []).map((opt: string, oIdx: number) => (
+                                <div key={oIdx} className={opt === q.correctAnswer ? "text-emerald-400 font-semibold" : ""}>
+                                  {String.fromCharCode(65 + oIdx)}. {opt} {opt === q.correctAnswer && "✓ (Correct Answer)"}
+                                </div>
+                              ))}
+                            </div>
+                            {q.explanation && (
+                              <p className="text-[#94A3B8] pt-1 text-[11px]">
+                                <strong>Explanation:</strong> {q.explanation}
+                              </p>
+                            )}
                           </div>
-                          <p className="text-[#94A3B8] pt-1 text-[11px]">
-                            <strong>Explanation:</strong> {q.explanation}
-                          </p>
-                        </div>
-                      ))}
+                        ))}
+                      </div>
                     </div>
-                  </div>
-                )}
+                  );
+                })()}
 
                 {proposal.type === "Feed Community" && (
                   <div className="space-y-3 text-xs">

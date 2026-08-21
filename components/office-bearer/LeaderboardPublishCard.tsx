@@ -109,6 +109,30 @@ export const LeaderboardPublishCard: React.FC<LeaderboardPublishCardProps> = ({
     role === "ADMIN" ||
     assignedResponsibility === "Placement Questions";
 
+  const handleResetLeaderboard = async () => {
+    if (!window.confirm("Are you sure you want to reset the leaderboard for a new placement round? This will advance the round/week number and unpublish current rankings until the new round completes.")) {
+      return;
+    }
+    setActionLoading(true);
+    setErrorMsg(null);
+    try {
+      const res = await fetch("/api/leaderboard", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ action: "reset" }),
+      });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.message || "Failed to reset leaderboard.");
+      setIsPublished(false);
+      setWeekNumber(data.weekNumber || (weekNumber + 1));
+      alert(`Leaderboard reset successfully for Round/Week ${data.weekNumber || (weekNumber + 1)}.`);
+    } catch (err: any) {
+      setErrorMsg(err.message || "Reset failed.");
+    } finally {
+      setActionLoading(false);
+    }
+  };
+
   return (
     <div className="p-5 sm:p-6 rounded-2xl bg-[#0D1B2A] border border-white/10 shadow-xl space-y-4">
       <div className="pb-3 border-b border-white/10 flex items-center justify-between flex-wrap gap-2">
@@ -118,10 +142,10 @@ export const LeaderboardPublishCard: React.FC<LeaderboardPublishCardProps> = ({
           </div>
           <div>
             <h3 className="text-base font-bold text-[#F8FAFC]">
-              Placement Leaderboard Publication Control
+              Placement Leaderboard Publication Control (Week {weekNumber})
             </h3>
             <p className="text-xs text-[#94A3B8]">
-              Manage public visibility and download official Placement Question assessment rankings.
+              Manage public visibility, reset rounds, and download official Placement assessment rankings.
             </p>
           </div>
         </div>
@@ -189,6 +213,20 @@ export const LeaderboardPublishCard: React.FC<LeaderboardPublishCardProps> = ({
               }
             >
               {downloadingExcel ? "Generating .xlsx..." : "Download Excel (.xlsx)"}
+            </Button>
+          )}
+
+          {/* Reset Leaderboard Round Button */}
+          {isObAuthorized && (
+            <Button
+              variant="outline"
+              size="sm"
+              disabled={actionLoading || loading}
+              onClick={handleResetLeaderboard}
+              className="text-amber-400 border-amber-500/30 hover:bg-amber-500/10"
+              leftIcon={<RefreshCw className="w-4 h-4" />}
+            >
+              Reset Round
             </Button>
           )}
 
