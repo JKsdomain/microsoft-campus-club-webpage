@@ -11,6 +11,7 @@ import {
   Megaphone,
   FileClock,
   Trash2,
+  Info,
   LogOut,
   X,
 } from "lucide-react";
@@ -24,6 +25,7 @@ const ADMIN_NAV_ITEMS = [
   { label: "Announcements", href: "/admin/announcements", icon: Megaphone },
   { label: "Audit & Logs", href: "/admin/audit-logs", icon: FileClock },
   { label: "Data Cleanup", href: "/admin/data-cleanup", icon: Trash2 },
+  { label: "About Us", href: "https://mcc-about-us-admin.vercel.app/", icon: Info },
 ];
 
 interface AdminSidebarProps {
@@ -80,8 +82,24 @@ export const AdminSidebar: React.FC<AdminSidebarProps> = ({
           Management
         </span>
         {ADMIN_NAV_ITEMS.map((item) => {
-          const isActive = pathname === item.href;
+          const isExternal = item.href.startsWith("http");
+          const isActive = !isExternal && pathname === item.href;
           const Icon = item.icon;
+
+          if (isExternal) {
+            return (
+              <a
+                key={item.href}
+                href={item.href}
+                onClick={onCloseMobile}
+                className="flex items-center gap-3 px-3.5 py-2.5 rounded-xl text-sm font-medium transition-all duration-150 text-[#CBD5E1] hover:text-[#0078D4] dark:hover:text-white hover:bg-slate-100 dark:hover:bg-white/[0.06]"
+              >
+                <Icon className="w-4 h-4 text-[#22D3EE]" />
+                <span>{item.label}</span>
+              </a>
+            );
+          }
+
           return (
             <Link
               key={item.href}
@@ -90,7 +108,7 @@ export const AdminSidebar: React.FC<AdminSidebarProps> = ({
               className={`flex items-center gap-3 px-3.5 py-2.5 rounded-xl text-sm font-medium transition-all duration-150 ${
                 isActive
                   ? "bg-[#0078D4] text-white shadow-md shadow-[#0078D4]/20"
-                  : "text-[#CBD5E1] hover:text-white hover:bg-white/[0.06]"
+                  : "text-[#CBD5E1] hover:text-[#0078D4] dark:hover:text-white hover:bg-slate-100 dark:hover:bg-white/[0.06]"
               }`}
             >
               <Icon className={`w-4 h-4 ${isActive ? "text-white" : "text-[#94A3B8]"}`} />

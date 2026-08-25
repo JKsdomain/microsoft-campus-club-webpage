@@ -46,9 +46,25 @@ export const Footer: React.FC = () => {
                 </Link>
               </li>
               <li>
+                <a
+                  href="https://technical-game-homepage.vercel.app/#games"
+                  className="hover:text-[#0078D4] transition-colors"
+                >
+                  Technical Games
+                </a>
+              </li>
+              <li>
                 <Link href="/announcements" className="hover:text-[#0078D4] transition-colors">
                   Announcements
                 </Link>
+              </li>
+              <li>
+                <a
+                  href="https://mcc-about-us-page.vercel.app/"
+                  className="hover:text-[#0078D4] transition-colors"
+                >
+                  About Us
+                </a>
               </li>
             </ul>
           </div>

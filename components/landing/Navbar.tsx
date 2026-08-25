@@ -13,6 +13,7 @@ const NAV_ITEMS = [
   { label: "Students Corner", href: "/students-corner" },
   { label: "Technical Games", href: "https://technical-game-homepage.vercel.app/#games" },
   { label: "Announcements", href: "/announcements" },
+  { label: "About Us", href: "https://mcc-about-us-page.vercel.app/" },
 ];
 
 export const Navbar: React.FC = () => {
