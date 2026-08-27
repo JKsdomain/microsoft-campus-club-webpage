@@ -35,18 +35,10 @@ export async function POST(req: Request) {
         await dbConnect();
         const adminDoc = await Admin.findOne({ email: cleanEmail });
         if (adminDoc && adminDoc.status === "ACTIVE") {
-          // If admin passwordHash is stored, check it or allow admin@MCC27
-          const isValid =
-            adminDoc.passwordHash === password ||
-            password === "admin@MCC27" ||
-            adminDoc.passwordHash === "admin@MCC27";
-
-          if (isValid) {
-            // Update stored password if needed
-            if (adminDoc.passwordHash !== "admin@MCC27") {
-              adminDoc.passwordHash = "admin@MCC27";
-              await adminDoc.save().catch(() => {});
-            }
+          // Strictly verify provided password against the database record
+          if (adminDoc.passwordHash === password) {
+            adminDoc.lastLoginAt = new Date();
+            await adminDoc.save().catch(() => {});
 
             console.log(`✅ [AUTH API] Admin login verified from MongoDB for: ${cleanEmail}`);
             const res = NextResponse.json({
@@ -58,21 +50,7 @@ export async function POST(req: Request) {
           }
         }
       } catch (dbErr: any) {
-        console.log(`⚠️ [AUTH API] MongoDB not connected yet (${dbErr.message}). Using local admin verification.`);
-      }
-
-      // Default Admin credential verification
-      if (
-        (cleanEmail === "admin@mcc.edu" || cleanEmail.startsWith("admin")) &&
-        (password === "admin@MCC27" || password === "admin123" || password === "admin")
-      ) {
-        console.log(`✅ [AUTH API] Default Admin credentials verified for: ${cleanEmail}`);
-        const res = NextResponse.json({
-          message: "Admin authentication successful",
-          user: { name: "Administrator", email: "admin@mcc.edu", role: "ADMIN" },
-        });
-        setAdminSessionCookies(res, cleanEmail);
-        return res;
+        console.error(`❌ [AUTH API] MongoDB error during admin login:`, dbErr);
       }
 
       console.log(`❌ [AUTH API] Admin login failed for: ${cleanEmail}`);
@@ -87,10 +65,13 @@ export async function POST(req: Request) {
         await dbConnect();
         obFound = await OfficeBearer.findOne({ email: cleanEmail, status: "ACTIVE" }).populate("responsibilityId");
       } catch (dbErr: any) {
-        console.log(`⚠️ [AUTH API] MongoDB connection status check: ${dbErr.message}`);
+        console.error(`❌ [AUTH API] MongoDB connection error:`, dbErr);
       }
 
-      if (obFound) {
+      if (obFound && obFound.passwordHash === password) {
+        obFound.lastLoginAt = new Date();
+        await obFound.save().catch(() => {});
+
         console.log(`✅ [AUTH API] Office Bearer verified from MongoDB for: ${cleanEmail}`);
         const res = NextResponse.json({
           message: "Office Bearer authentication successful",
@@ -107,9 +88,9 @@ export async function POST(req: Request) {
         return res;
       }
 
-      console.log(`❌ [AUTH API] Office Bearer login REJECTED (account not found or inactive) for: ${cleanEmail}`);
+      console.log(`❌ [AUTH API] Office Bearer login REJECTED (invalid credentials or inactive) for: ${cleanEmail}`);
       return NextResponse.json(
-        { message: "Invalid credentials. No active Office Bearer account found." },
+        { message: "Invalid credentials. Please verify your email and password." },
         { status: 401 }
       );
     }
