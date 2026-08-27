@@ -6,7 +6,6 @@ import { usePathname } from "next/navigation";
 import { Menu, X, ShieldCheck, UserCheck } from "lucide-react";
 import { Container } from "../ui/Container";
 import { Button } from "../ui/Button";
-import { ThemeToggle } from "../ui/ThemeToggle";
 
 const NAV_ITEMS = [
   { label: "Home", href: "/" },
@@ -97,9 +96,8 @@ export const Navbar: React.FC = () => {
             })}
           </nav>
 
-          {/* Desktop Role Authentication Entry Points & Theme Toggle */}
+          {/* Desktop Role Authentication Entry Points */}
           <div className="hidden lg:flex items-center space-x-2.5">
-            <ThemeToggle showText />
             <Button
               href="/office-bearer/login"
               variant="ob-login"
@@ -120,7 +118,6 @@ export const Navbar: React.FC = () => {
 
           {/* Mobile Menu Toggle Button */}
           <div className="lg:hidden flex items-center space-x-2">
-            <ThemeToggle />
             <button
               onClick={() => setMobileMenuOpen(!mobileMenuOpen)}
               className="p-2 rounded-lg text-[#CBD5E1] hover:text-white hover:bg-white/10 focus:outline-none focus-visible:ring-2 focus-visible:ring-[#0078D4]"
@@ -168,12 +165,6 @@ export const Navbar: React.FC = () => {
             </div>
 
             <div className="pt-4 border-t border-white/10 flex flex-col space-y-2.5">
-              <div className="flex items-center justify-between px-1 py-1">
-                <span className="text-xs font-semibold uppercase tracking-wider text-[#94A3B8]">
-                  Theme
-                </span>
-                <ThemeToggle showText />
-              </div>
               <Button
                 href="/office-bearer/login"
                 variant="ob-login"

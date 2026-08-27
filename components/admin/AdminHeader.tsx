@@ -4,7 +4,6 @@ import React from "react";
 import { useRouter } from "next/navigation";
 import { Menu, LogOut, Shield } from "lucide-react";
 import { useAdminAuth } from "./AdminAuthProvider";
-import { ThemeToggle } from "../ui/ThemeToggle";
 
 interface AdminHeaderProps {
   title: string;
@@ -41,10 +40,8 @@ export const AdminHeader: React.FC<AdminHeaderProps> = ({
         </div>
       </div>
 
-      {/* Right: Authenticated Admin Status, Theme Toggle & Logout */}
+      {/* Right: Authenticated Admin Status & Logout */}
       <div className="flex items-center space-x-3 sm:space-x-4">
-        <ThemeToggle showText />
-
         <div className="hidden sm:flex items-center space-x-3 px-3 py-1.5 rounded-xl bg-[#0D1B2A] border border-white/10">
           <div className="w-8 h-8 rounded-lg bg-purple-500/20 border border-purple-500/30 flex items-center justify-center">
             <Shield className="w-4 h-4 text-purple-400" />

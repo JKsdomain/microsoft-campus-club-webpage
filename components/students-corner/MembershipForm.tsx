@@ -16,8 +16,6 @@ const DEPARTMENTS = [
 const GENDERS = ["Male", "Female", "Other"];
 
 const SEMESTERS = [
-  "1st Semester",
-  "2nd Semester",
   "3rd Semester",
   "4th Semester",
   "5th Semester",
@@ -47,7 +45,7 @@ export const MembershipForm: React.FC = () => {
   const [rollNumberSection, setRollNumberSection] = useState<string>("");
   const [department, setDepartment] = useState<string>(DEPARTMENTS[0]);
   const [gender, setGender] = useState<string>(GENDERS[0]);
-  const [semester, setSemester] = useState<string>(SEMESTERS[4]); // Default 5th
+  const [semester, setSemester] = useState<string>(SEMESTERS[2]); // Default 5th
   const [dateOfBirth, setDateOfBirth] = useState<string>("");
   const [batch, setBatch] = useState<string>(BATCHES[1]); // Default 2023-2027
   const [hostellerDayScholar, setHostellerDayScholar] = useState<string>(RESIDENCE_TYPES[0]);

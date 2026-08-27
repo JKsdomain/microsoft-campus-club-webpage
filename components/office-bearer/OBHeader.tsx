@@ -4,7 +4,6 @@ import React from "react";
 import { useRouter } from "next/navigation";
 import { Menu, LogOut, Award } from "lucide-react";
 import { useOBAuth } from "./OBAuthProvider";
-import { ThemeToggle } from "../ui/ThemeToggle";
 
 interface OBHeaderProps {
   title: string;
@@ -41,10 +40,8 @@ export const OBHeader: React.FC<OBHeaderProps> = ({
         </div>
       </div>
 
-      {/* Right: Authenticated OB Info, Theme Toggle & Logout */}
+      {/* Right: Authenticated OB Info & Logout */}
       <div className="flex items-center space-x-3 sm:space-x-4">
-        <ThemeToggle showText />
-
         <div className="hidden sm:flex items-center space-x-3 px-3 py-1.5 rounded-xl bg-[#0D1B2A] border border-white/10">
           <div className="w-8 h-8 rounded-lg bg-[#0078D4]/20 border border-[#0078D4]/30 flex items-center justify-center">
             <Award className="w-4 h-4 text-[#22D3EE]" />
