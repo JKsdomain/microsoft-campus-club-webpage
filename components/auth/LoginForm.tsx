@@ -24,6 +24,7 @@ export const LoginForm: React.FC<LoginFormProps> = ({
   const [password, setPassword] = useState("");
   const [isLoading, setIsLoading] = useState(false);
   const [modalType, setModalType] = useState<ModalType>(null);
+  const [modalMessage, setModalMessage] = useState<string>("");
   const router = useRouter();
 
   // Optionally obtain auth context methods if rendered inside their providers
@@ -37,16 +38,18 @@ export const LoginForm: React.FC<LoginFormProps> = ({
     if (!email || !password) return;
 
     setIsLoading(true);
+    setModalMessage("");
 
     try {
       const response = await fetch("/api/auth/login", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ email: email.trim(), password: password.trim(), role }),
+        body: JSON.stringify({ email: email.trim(), password: password, role }),
       });
 
+      const data = await response.json().catch(() => ({}));
+
       if (response.ok) {
-        const data = await response.json().catch(() => ({}));
         const cleanEmail = email.trim();
 
         if (role === "admin") {
@@ -63,12 +66,15 @@ export const LoginForm: React.FC<LoginFormProps> = ({
             } : undefined);
           }
         }
+        setModalMessage(data.message || "Authentication completed successfully.");
         setModalType("success");
       } else {
-        setModalType("invalid");
+        setModalMessage(data.message || "Invalid credentials. Please verify your email and password.");
+        setModalType(response.status === 500 ? "error" : "invalid");
       }
     } catch {
-      setModalType("invalid");
+      setModalMessage("We couldn't connect to the authentication server. Please check your connection.");
+      setModalType("error");
     } finally {
       setIsLoading(false);
     }
@@ -77,6 +83,7 @@ export const LoginForm: React.FC<LoginFormProps> = ({
   const handleModalConfirm = () => {
     const currentModal = modalType;
     setModalType(null);
+    setModalMessage("");
 
     // Navigate cleanly after authenticated session is established
     if (currentModal === "success") {
@@ -160,6 +167,7 @@ export const LoginForm: React.FC<LoginFormProps> = ({
       <LoginModal
         type={modalType}
         role={role}
+        message={modalMessage}
         onConfirm={handleModalConfirm}
       />
     </div>

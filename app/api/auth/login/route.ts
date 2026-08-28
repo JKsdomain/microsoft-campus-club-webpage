@@ -1,6 +1,6 @@
 import { NextResponse } from "next/server";
 import { dbConnect } from "@/lib/db/dbConnect";
-import { OfficeBearer, Admin } from "@/lib/db/models";
+import { OfficeBearer, Admin, Responsibility } from "@/lib/db/models";
 
 export async function POST(req: Request) {
   try {
@@ -15,6 +15,9 @@ export async function POST(req: Request) {
     }
 
     const cleanEmail = String(email).trim().toLowerCase();
+    const cleanPassword = String(password).trim();
+    const escapedEmail = cleanEmail.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+
     console.log(`🔐 [AUTH API] Processing ${role.toUpperCase()} login attempt for: ${cleanEmail}`);
 
     // Helper to set Admin session and clear OB session
@@ -33,10 +36,28 @@ export async function POST(req: Request) {
     if (role === "admin") {
       try {
         await dbConnect();
-        const adminDoc = await Admin.findOne({ email: cleanEmail });
-        if (adminDoc && adminDoc.status === "ACTIVE") {
+        // Ensure Responsibility model is registered for populate references
+        void Responsibility;
+
+        const adminDoc = await Admin.findOne({
+          email: { $regex: new RegExp(`^${escapedEmail}$`, "i") },
+        });
+
+        if (adminDoc) {
+          if (adminDoc.status && adminDoc.status.toUpperCase() === "INACTIVE") {
+            return NextResponse.json(
+              { message: "Your Administrator account is currently inactive. Please contact the system administrator." },
+              { status: 403 }
+            );
+          }
+
           // Strictly verify provided password against the database record
-          if (adminDoc.passwordHash === password) {
+          const isAdminPasswordMatch =
+            adminDoc.passwordHash === password ||
+            String(adminDoc.passwordHash).trim() === cleanPassword ||
+            adminDoc.passwordHash === cleanPassword;
+
+          if (isAdminPasswordMatch) {
             adminDoc.lastLoginAt = new Date();
             await adminDoc.save().catch(() => {});
 
@@ -45,7 +66,7 @@ export async function POST(req: Request) {
               message: "Admin authentication successful",
               user: { id: String(adminDoc._id), name: adminDoc.name, email: adminDoc.email, role: "ADMIN" },
             });
-            setAdminSessionCookies(res, cleanEmail);
+            setAdminSessionCookies(res, adminDoc.email || cleanEmail);
             return res;
           }
         }
@@ -63,32 +84,60 @@ export async function POST(req: Request) {
 
       try {
         await dbConnect();
-        obFound = await OfficeBearer.findOne({ email: cleanEmail, status: "ACTIVE" }).populate("responsibilityId");
+        // Ensure Responsibility model is registered
+        void Responsibility;
+
+        // Find Office Bearer by case-insensitive email
+        obFound = await OfficeBearer.findOne({
+          email: { $regex: new RegExp(`^${escapedEmail}$`, "i") },
+        }).populate("responsibilityId");
       } catch (dbErr: any) {
         console.error(`❌ [AUTH API] MongoDB connection error:`, dbErr);
       }
 
-      if (obFound && obFound.passwordHash === password) {
-        obFound.lastLoginAt = new Date();
-        await obFound.save().catch(() => {});
+      if (obFound) {
+        // Check inactive status (case-insensitive)
+        if (obFound.status && obFound.status.toUpperCase() === "INACTIVE") {
+          console.log(`⚠️ [AUTH API] Inactive Office Bearer attempted login: ${cleanEmail}`);
+          return NextResponse.json(
+            { message: "Your Office Bearer account is currently inactive. Please contact an Administrator." },
+            { status: 403 }
+          );
+        }
 
-        console.log(`✅ [AUTH API] Office Bearer verified from MongoDB for: ${cleanEmail}`);
-        const res = NextResponse.json({
-          message: "Office Bearer authentication successful",
-          user: {
-            id: String(obFound._id),
-            name: obFound.name,
-            email: obFound.email,
-            department: obFound.department || "Computer Science",
-            responsibility: obFound.responsibilityId ? (obFound.responsibilityId as any).name : "Unassigned",
-            role: "OFFICE_BEARER",
-          },
-        });
-        setObSessionCookies(res, cleanEmail);
-        return res;
+        // Compare password safely
+        const isPasswordMatch =
+          obFound.passwordHash === password ||
+          String(obFound.passwordHash).trim() === cleanPassword ||
+          obFound.passwordHash === cleanPassword;
+
+        if (isPasswordMatch) {
+          obFound.lastLoginAt = new Date();
+          await obFound.save().catch(() => {});
+
+          const respName =
+            obFound.responsibilityId && typeof obFound.responsibilityId === "object"
+              ? (obFound.responsibilityId as any).name || "Unassigned"
+              : "Unassigned";
+
+          console.log(`✅ [AUTH API] Office Bearer verified from MongoDB for: ${obFound.email}`);
+          const res = NextResponse.json({
+            message: "Office Bearer authentication successful",
+            user: {
+              id: String(obFound._id),
+              name: obFound.name,
+              email: obFound.email,
+              department: obFound.department || "Computer Science & Engineering",
+              responsibility: respName,
+              role: "OFFICE_BEARER",
+            },
+          });
+          setObSessionCookies(res, obFound.email || cleanEmail);
+          return res;
+        }
       }
 
-      console.log(`❌ [AUTH API] Office Bearer login REJECTED (invalid credentials or inactive) for: ${cleanEmail}`);
+      console.log(`❌ [AUTH API] Office Bearer login REJECTED (invalid credentials or user not found) for: ${cleanEmail}`);
       return NextResponse.json(
         { message: "Invalid credentials. Please verify your email and password." },
         { status: 401 }

@@ -1,6 +1,6 @@
 import { ReadonlyRequestCookies } from "next/dist/server/web/spec-extension/adapters/request-cookies";
 import { dbConnect } from "./db/dbConnect";
-import { Admin, OfficeBearer } from "./db/models";
+import { Admin, OfficeBearer, Responsibility } from "./db/models";
 
 export interface AuthSessionUser {
   role: "ADMIN" | "OFFICE_BEARER";
@@ -38,14 +38,18 @@ export async function getAuthenticatedUser(
   const obCookie = cookieStore.get("mcc_ob_session");
 
   await dbConnect();
+  void Responsibility;
 
   // 1. Check Admin Session
   if (adminCookie?.value) {
     const adminEmail = extractCookieEmail(adminCookie.value);
     if (adminEmail) {
       try {
-        const adminDoc = await Admin.findOne({ email: adminEmail, status: "ACTIVE" });
-        if (adminDoc) {
+        const escapedEmail = adminEmail.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+        const adminDoc = await Admin.findOne({
+          email: { $regex: new RegExp(`^${escapedEmail}$`, "i") },
+        });
+        if (adminDoc && adminDoc.status?.toUpperCase() !== "INACTIVE") {
           return {
             role: "ADMIN",
             name: adminDoc.name || "Administrator",
@@ -70,9 +74,16 @@ export async function getAuthenticatedUser(
     const obEmail = extractCookieEmail(obCookie.value);
     if (obEmail) {
       try {
-        const obDoc = await OfficeBearer.findOne({ email: obEmail, status: "ACTIVE" }).populate("responsibilityId");
-        if (obDoc) {
-          const respName = obDoc.responsibilityId ? (obDoc.responsibilityId as any).name : "Unassigned";
+        const escapedEmail = obEmail.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+        const obDoc = await OfficeBearer.findOne({
+          email: { $regex: new RegExp(`^${escapedEmail}$`, "i") },
+        }).populate("responsibilityId");
+
+        if (obDoc && obDoc.status?.toUpperCase() !== "INACTIVE") {
+          const respName =
+            obDoc.responsibilityId && typeof obDoc.responsibilityId === "object"
+              ? (obDoc.responsibilityId as any).name || "Unassigned"
+              : "Unassigned";
           return {
             role: "OFFICE_BEARER",
             name: obDoc.name,

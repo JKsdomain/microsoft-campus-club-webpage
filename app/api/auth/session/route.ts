@@ -1,7 +1,7 @@
 import { NextResponse } from "next/server";
 import { cookies } from "next/headers";
 import { dbConnect } from "@/lib/db/dbConnect";
-import { OfficeBearer, Admin } from "@/lib/db/models";
+import { OfficeBearer, Admin, Responsibility } from "@/lib/db/models";
 
 export async function GET() {
   try {
@@ -11,11 +11,15 @@ export async function GET() {
 
     if (adminSession) {
       const cleanEmail = decodeURIComponent(adminSession).trim().toLowerCase();
+      const escapedEmail = cleanEmail.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
 
       try {
         await dbConnect();
-        const adminDoc = await Admin.findOne({ email: cleanEmail });
-        if (adminDoc && adminDoc.status === "ACTIVE") {
+        void Responsibility;
+        const adminDoc = await Admin.findOne({
+          email: { $regex: new RegExp(`^${escapedEmail}$`, "i") },
+        });
+        if (adminDoc && adminDoc.status?.toUpperCase() !== "INACTIVE") {
           return NextResponse.json({
             authenticated: true,
             role: "ADMIN",
@@ -39,11 +43,21 @@ export async function GET() {
 
     if (obSession) {
       const cleanEmail = decodeURIComponent(obSession).trim().toLowerCase();
+      const escapedEmail = cleanEmail.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
 
       try {
         await dbConnect();
-        const obFound = await OfficeBearer.findOne({ email: cleanEmail, status: "ACTIVE" }).populate("responsibilityId");
-        if (obFound) {
+        void Responsibility;
+        const obFound = await OfficeBearer.findOne({
+          email: { $regex: new RegExp(`^${escapedEmail}$`, "i") },
+        }).populate("responsibilityId");
+
+        if (obFound && obFound.status?.toUpperCase() !== "INACTIVE") {
+          const respName =
+            obFound.responsibilityId && typeof obFound.responsibilityId === "object"
+              ? (obFound.responsibilityId as any).name || "Unassigned"
+              : "Unassigned";
+
           return NextResponse.json({
             authenticated: true,
             role: "OFFICE_BEARER",
@@ -52,8 +66,8 @@ export async function GET() {
               id: String(obFound._id),
               name: obFound.name,
               email: obFound.email,
-              department: obFound.department || "Computer Science",
-              responsibility: obFound.responsibilityId ? (obFound.responsibilityId as any).name : "Unassigned",
+              department: obFound.department || "Computer Science & Engineering",
+              responsibility: respName,
               role: "OFFICE_BEARER",
             },
           });
@@ -70,7 +84,7 @@ export async function GET() {
           id: "ob-session",
           name: cleanEmail.split("@")[0] || "Office Bearer",
           email: cleanEmail,
-          department: "Computer Science",
+          department: "Computer Science & Engineering",
           responsibility: "Unassigned",
           role: "OFFICE_BEARER",
         },

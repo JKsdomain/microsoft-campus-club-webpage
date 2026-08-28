@@ -9,12 +9,14 @@ export type ModalType = "success" | "invalid" | "error" | null;
 interface LoginModalProps {
   type: ModalType;
   role: "admin" | "office-bearer";
+  message?: string;
   onConfirm: () => void;
 }
 
 export const LoginModal: React.FC<LoginModalProps> = ({
   type,
   role,
+  message,
   onConfirm,
 }) => {
   const buttonRef = useRef<HTMLButtonElement>(null);
@@ -44,14 +46,14 @@ export const LoginModal: React.FC<LoginModalProps> = ({
           icon: <CheckCircle2 className="w-10 h-10 text-[#22D3EE]" />,
           iconBg: "bg-[#22D3EE]/10 border-[#22D3EE]/30",
           title: "Login Successful",
-          description: "Authentication completed successfully.",
+          description: message || "Authentication completed successfully.",
         };
       case "invalid":
         return {
           icon: <AlertCircle className="w-10 h-10 text-amber-400" />,
           iconBg: "bg-amber-500/10 border-amber-500/30",
           title: "Login Failed",
-          description: "Invalid email or password.",
+          description: message || "Invalid email or password.",
         };
       case "error":
       default:
@@ -59,7 +61,7 @@ export const LoginModal: React.FC<LoginModalProps> = ({
           icon: <AlertTriangle className="w-10 h-10 text-red-400" />,
           iconBg: "bg-red-500/10 border-red-500/30",
           title: "Unable to Sign In",
-          description: "We couldn't connect to the MCC platform. Please try again.",
+          description: message || "We couldn't connect to the MCC platform. Please try again.",
         };
     }
   };
@@ -94,7 +96,7 @@ export const LoginModal: React.FC<LoginModalProps> = ({
         {/* Description */}
         <p
           id="modal-description"
-          className="text-sm text-[#CBD5E1] leading-relaxed mb-6"
+          className="text-sm text-[#CBD5E1] leading-relaxed mb-6 whitespace-pre-line"
         >
           {config.description}
         </p>
