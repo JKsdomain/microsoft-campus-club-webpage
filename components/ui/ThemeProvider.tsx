@@ -2,7 +2,7 @@
 
 import React, { createContext, useContext, useEffect, useState } from "react";
 
-export type Theme = "dark" | "light";
+export type Theme = "dark";
 
 interface ThemeContextType {
   theme: Theme;
@@ -13,39 +13,29 @@ interface ThemeContextType {
 const ThemeContext = createContext<ThemeContextType | undefined>(undefined);
 
 export const ThemeProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
-  const [theme, setThemeState] = useState<Theme>("dark");
+  const [theme] = useState<Theme>("dark");
 
   useEffect(() => {
     try {
-      const saved = localStorage.getItem("mcc_theme") as Theme | null;
-      if (saved === "light" || saved === "dark") {
-        setThemeState(saved);
-        document.documentElement.classList.remove("dark", "light");
-        document.documentElement.classList.add(saved);
-      } else {
-        const prefersLight = window.matchMedia("(prefers-color-scheme: light)").matches;
-        const initial = prefersLight ? "light" : "dark";
-        setThemeState(initial);
-        document.documentElement.classList.remove("dark", "light");
-        document.documentElement.classList.add(initial);
-      }
+      localStorage.setItem("mcc_theme", "dark");
+      document.documentElement.classList.remove("light");
+      document.documentElement.classList.add("dark");
     } catch (e) {
       console.error("Theme initialization error:", e);
     }
   }, []);
 
-  const setTheme = (newTheme: Theme) => {
-    setThemeState(newTheme);
+  const setTheme = (_newTheme: Theme) => {
     try {
-      localStorage.setItem("mcc_theme", newTheme);
+      localStorage.setItem("mcc_theme", "dark");
     } catch (e) {}
-    document.documentElement.classList.remove("dark", "light");
-    document.documentElement.classList.add(newTheme);
+    document.documentElement.classList.remove("light");
+    document.documentElement.classList.add("dark");
   };
 
   const toggleTheme = () => {
-    const next = theme === "dark" ? "light" : "dark";
-    setTheme(next);
+    // Locked to dark theme permanently
+    setTheme("dark");
   };
 
   return (
