@@ -8,7 +8,14 @@ import { Button } from "../ui/Button";
 interface UserFormModalProps {
   isOpen: boolean;
   onClose: () => void;
-  onSave: (obData: { name: string; email: string; department: string; responsibility: string; status: "Active" | "Inactive" }) => void;
+  onSave: (obData: {
+    name: string;
+    email: string;
+    department: string;
+    responsibility: string;
+    status: "Active" | "Inactive";
+    password?: string;
+  }) => Promise<void> | void;
   initialData?: OfficeBearer | null;
 }
 
@@ -41,6 +48,7 @@ export const UserFormModal: React.FC<UserFormModalProps> = ({
   const [department, setDepartment] = useState(DEPARTMENTS[0]);
   const [responsibility, setResponsibility] = useState(RESPONSIBILITIES[0]);
   const [status, setStatus] = useState<"Active" | "Inactive">("Active");
+  const [password, setPassword] = useState("ob123");
   const [isSubmitting, setIsSubmitting] = useState(false);
 
   useEffect(() => {
@@ -51,12 +59,14 @@ export const UserFormModal: React.FC<UserFormModalProps> = ({
       setDepartment(initialData.department);
       setResponsibility(initialData.responsibility);
       setStatus(initialData.status);
+      setPassword("");
     } else {
       setName("");
       setEmail("");
       setDepartment(DEPARTMENTS[0]);
       setResponsibility(RESPONSIBILITIES[4]); // Unassigned default
       setStatus("Active");
+      setPassword("ob123");
     }
   }, [initialData, isOpen]);
 
@@ -74,6 +84,7 @@ export const UserFormModal: React.FC<UserFormModalProps> = ({
         department,
         responsibility,
         status,
+        password: !initialData && password ? password.trim() : undefined,
       });
       onClose();
     } finally {
@@ -126,6 +137,25 @@ export const UserFormModal: React.FC<UserFormModalProps> = ({
               className="w-full h-11 px-3.5 rounded-xl bg-[#07111F] border border-white/15 text-[#F8FAFC] placeholder-[#94A3B8] text-sm focus:outline-none focus:border-[#0078D4]"
             />
           </div>
+
+          {!initialData && (
+            <div>
+              <label className="block text-xs font-medium text-[#CBD5E1] mb-1.5">
+                Initial Password (for login)
+              </label>
+              <input
+                type="text"
+                required
+                value={password}
+                onChange={(e) => setPassword(e.target.value)}
+                placeholder="e.g. ob123"
+                className="w-full h-11 px-3.5 rounded-xl bg-[#07111F] border border-white/15 text-[#F8FAFC] placeholder-[#94A3B8] text-sm focus:outline-none focus:border-[#0078D4] font-mono"
+              />
+              <p className="text-[11px] text-[#94A3B8] mt-1">
+                The Office Bearer will use this password to sign into the OB portal.
+              </p>
+            </div>
+          )}
 
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
             <div>

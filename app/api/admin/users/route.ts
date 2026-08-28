@@ -6,6 +6,7 @@ import { OfficeBearer, Responsibility, Admin, AuditLog } from "@/lib/db/models";
 export async function GET() {
   try {
     await dbConnect();
+    void Responsibility;
     const obs = await OfficeBearer.find().populate("responsibilityId").sort({ createdAt: -1 });
 
     const formatted = obs.map((ob: any) => ({
@@ -29,17 +30,21 @@ export async function GET() {
 export async function POST(req: Request) {
   try {
     await dbConnect();
+    void Responsibility;
     const body = await req.json();
-    const { name, email, department, responsibility, status } = body;
+    const { name, email, department, responsibility, status, password } = body;
 
     if (!name || !email) {
       return NextResponse.json({ message: "Name and Email are required." }, { status: 400 });
     }
 
     const cleanEmail = String(email).trim().toLowerCase();
+    const escapedEmail = cleanEmail.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
 
-    // Check if user already exists in MongoDB
-    const existingUser = await OfficeBearer.findOne({ email: cleanEmail });
+    // Check if user already exists in MongoDB Atlas
+    const existingUser = await OfficeBearer.findOne({
+      email: { $regex: new RegExp(`^${escapedEmail}$`, "i") },
+    });
     if (existingUser) {
       return NextResponse.json({ message: `An account with email '${cleanEmail}' already exists in MongoDB.` }, { status: 400 });
     }
@@ -47,7 +52,9 @@ export async function POST(req: Request) {
     // Resolve Responsibility ObjectId from DB
     let respId = null;
     if (responsibility && responsibility !== "Unassigned") {
-      const respDoc = await Responsibility.findOne({ name: { $regex: new RegExp(`^${responsibility}$`, "i") } });
+      const respDoc = await Responsibility.findOne({
+        name: { $regex: new RegExp(`^${responsibility.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")}$`, "i") },
+      });
       if (respDoc) {
         respId = respDoc._id;
       }
@@ -56,14 +63,17 @@ export async function POST(req: Request) {
     // Default admin reference
     const adminDoc = await Admin.findOne({ email: "admin@mcc.edu" });
 
+    // Set initial password (custom provided by admin, or default "ob123")
+    const initialPassword = password && String(password).trim() ? String(password).trim() : "ob123";
+
     // Create Office Bearer in MongoDB Atlas
     const newOb = await OfficeBearer.create({
       name: String(name).trim(),
       email: cleanEmail,
-      passwordHash: "ob123", // Default password
+      passwordHash: initialPassword,
       department: department || "Computer Science & Engineering",
       responsibilityId: respId,
-      status: status === "Active" ? "ACTIVE" : "INACTIVE",
+      status: status === "Inactive" ? "INACTIVE" : "ACTIVE",
       createdBy: adminDoc ? adminDoc._id : null,
     });
 
@@ -85,6 +95,7 @@ export async function POST(req: Request) {
         email: newOb.email,
         department: newOb.department,
         status: newOb.status,
+        responsibility: newOb.responsibilityId ? newOb.responsibilityId.name : "Unassigned",
       },
       metadata: { email: newOb.email, department: newOb.department },
     });
@@ -99,7 +110,7 @@ export async function POST(req: Request) {
       joinedDate: new Date(newOb.createdAt).toISOString().split("T")[0],
     };
 
-    console.log(`✅ [MONGODB ATLAS] Created new Office Bearer: ${userObj.email}`);
+    console.log(`✅ [MONGODB ATLAS] Created new Office Bearer: ${userObj.email} with status ${newOb.status}`);
     return NextResponse.json({ message: "Office Bearer created successfully in database.", user: userObj }, { status: 201 });
   } catch (error: any) {
     console.error("❌ [API POST /users] Error creating office bearer:", error);
@@ -111,8 +122,9 @@ export async function POST(req: Request) {
 export async function PUT(req: Request) {
   try {
     await dbConnect();
+    void Responsibility;
     const body = await req.json();
-    const { id, name, email, department, responsibility, status, newPassword } = body;
+    const { id, name, email, department, responsibility, status, newPassword, password } = body;
 
     if (!id) {
       return NextResponse.json({ message: "User ID is required." }, { status: 400 });
@@ -135,14 +147,21 @@ export async function PUT(req: Request) {
     if (name) ob.name = String(name).trim();
     if (email) ob.email = String(email).trim().toLowerCase();
     if (department) ob.department = department;
-    if (status) ob.status = status === "Active" ? "ACTIVE" : "INACTIVE";
-    if (newPassword) ob.passwordHash = newPassword;
+    if (status) ob.status = status === "Inactive" ? "INACTIVE" : "ACTIVE";
+
+    // Set updated password if provided
+    const passwordToUpdate = newPassword || password;
+    if (passwordToUpdate && String(passwordToUpdate).trim()) {
+      ob.passwordHash = String(passwordToUpdate).trim();
+    }
 
     if (responsibility !== undefined) {
       if (responsibility === "Unassigned") {
         ob.responsibilityId = null;
       } else {
-        const respDoc = await Responsibility.findOne({ name: { $regex: new RegExp(`^${responsibility}$`, "i") } });
+        const respDoc = await Responsibility.findOne({
+          name: { $regex: new RegExp(`^${responsibility.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")}$`, "i") },
+        });
         if (respDoc) {
           ob.responsibilityId = respDoc._id;
         }
@@ -158,15 +177,15 @@ export async function PUT(req: Request) {
       department: ob.department,
       status: ob.status,
       responsibility: ob.responsibilityId ? (ob.responsibilityId.name || String(ob.responsibilityId)) : "Unassigned",
-      passwordChanged: Boolean(newPassword),
+      passwordChanged: Boolean(passwordToUpdate),
     };
 
-    // Audit Log in MongoDB with original & modified values
+    // Audit Log in MongoDB Atlas
     await AuditLog.create({
       actorType: "ADMIN",
       actorName: "Administrator",
       role: "Administrator",
-      action: newPassword ? "OB_CREDENTIALS_CHANGED" : "OB_UPDATED",
+      action: passwordToUpdate ? "OB_CREDENTIALS_CHANGED" : "OB_UPDATED",
       module: "User Management",
       targetId: ob._id,
       targetType: "OFFICE_BEARER",
@@ -185,7 +204,7 @@ export async function PUT(req: Request) {
       joinedDate: new Date(ob.createdAt).toISOString().split("T")[0],
     };
 
-    console.log(`✅ [MONGODB ATLAS] Updated Office Bearer: ${userObj.email}`);
+    console.log(`✅ [MONGODB ATLAS] Updated Office Bearer: ${userObj.email} (Password changed: ${Boolean(passwordToUpdate)})`);
     return NextResponse.json({ message: "Office Bearer updated in database.", user: userObj });
   } catch (error: any) {
     console.error("❌ [API PUT /users] Error updating office bearer:", error);

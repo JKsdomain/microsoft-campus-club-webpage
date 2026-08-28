@@ -9,7 +9,7 @@ interface CredentialDialogProps {
   isOpen: boolean;
   ob: OfficeBearer | null;
   onClose: () => void;
-  onConfirm: (id: string) => void;
+  onConfirm: (id: string, newPassword: string) => Promise<void> | void;
 }
 
 export const CredentialDialog: React.FC<CredentialDialogProps> = ({
@@ -21,11 +21,12 @@ export const CredentialDialog: React.FC<CredentialDialogProps> = ({
   const [newPassword, setNewPassword] = useState("");
   const [confirmPassword, setConfirmPassword] = useState("");
   const [success, setSuccess] = useState(false);
+  const [isSubmitting, setIsSubmitting] = useState(false);
   const [errorMsg, setErrorMsg] = useState("");
 
   if (!isOpen || !ob) return null;
 
-  const handleSubmit = (e: React.FormEvent) => {
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!newPassword || newPassword.length < 6) {
       setErrorMsg("Password must be at least 6 characters long.");
@@ -37,14 +38,22 @@ export const CredentialDialog: React.FC<CredentialDialogProps> = ({
     }
 
     setErrorMsg("");
-    onConfirm(ob.id);
-    setSuccess(true);
-    setTimeout(() => {
-      setSuccess(false);
-      setNewPassword("");
-      setConfirmPassword("");
-      onClose();
-    }, 1200);
+    setIsSubmitting(true);
+
+    try {
+      await onConfirm(ob.id, newPassword);
+      setSuccess(true);
+      setTimeout(() => {
+        setSuccess(false);
+        setNewPassword("");
+        setConfirmPassword("");
+        onClose();
+      }, 1200);
+    } catch (err: any) {
+      setErrorMsg(err.message || "Failed to update credentials in database.");
+    } finally {
+      setIsSubmitting(false);
+    }
   };
 
   return (
@@ -72,7 +81,7 @@ export const CredentialDialog: React.FC<CredentialDialogProps> = ({
               Credentials Updated!
             </h4>
             <p className="text-xs text-[#CBD5E1]">
-              New password has been set for {ob.name}.
+              New password has been persisted to the database for {ob.name}.
             </p>
           </div>
         ) : (
@@ -95,7 +104,7 @@ export const CredentialDialog: React.FC<CredentialDialogProps> = ({
                 required
                 value={newPassword}
                 onChange={(e) => setNewPassword(e.target.value)}
-                placeholder="Enter new password"
+                placeholder="Enter new password (min 6 characters)"
                 className="w-full h-11 px-3.5 rounded-xl bg-[#07111F] border border-white/15 text-[#F8FAFC] placeholder-[#94A3B8] text-sm focus:outline-none focus:border-[#0078D4]"
               />
             </div>
@@ -119,11 +128,11 @@ export const CredentialDialog: React.FC<CredentialDialogProps> = ({
             )}
 
             <div className="pt-4 border-t border-white/10 flex items-center justify-end space-x-3 mt-6">
-              <Button type="button" variant="ghost" size="md" onClick={onClose}>
+              <Button type="button" variant="ghost" size="md" onClick={onClose} disabled={isSubmitting}>
                 Cancel
               </Button>
-              <Button type="submit" variant="primary" size="md">
-                Update Password
+              <Button type="submit" variant="primary" size="md" disabled={isSubmitting}>
+                {isSubmitting ? "Updating..." : "Update Password"}
               </Button>
             </div>
           </form>

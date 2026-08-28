@@ -26,10 +26,10 @@ interface AdminAuthContextType {
   logoutAdmin: () => void;
 
   officeBearers: OfficeBearer[];
-  addOfficeBearer: (ob: Omit<OfficeBearer, "id" | "joinedDate">) => void;
-  updateOfficeBearer: (id: string, ob: Partial<OfficeBearer>) => void;
-  deleteOfficeBearer: (id: string) => void;
-  changeObCredentials: (id: string) => void;
+  addOfficeBearer: (ob: Omit<OfficeBearer, "id" | "joinedDate"> & { password?: string }) => Promise<void> | void;
+  updateOfficeBearer: (id: string, ob: Partial<OfficeBearer>) => Promise<void> | void;
+  deleteOfficeBearer: (id: string) => Promise<void> | void;
+  changeObCredentials: (id: string, newPassword: string) => Promise<void> | void;
 
   assignments: ActivityAssignment[];
   assignObToActivity: (activityId: string, obId: string) => void;
@@ -248,8 +248,8 @@ export const AdminAuthProvider: React.FC<{ children: React.ReactNode }> = ({ chi
     setAuditLogs((prev) => [newLog, ...prev]);
   };
 
-  // User Management MongoDB CRUD
-  const addOfficeBearer = async (obData: Omit<OfficeBearer, "id" | "joinedDate">) => {
+  // User Management MongoDB Atlas CRUD
+  const addOfficeBearer = async (obData: Omit<OfficeBearer, "id" | "joinedDate"> & { password?: string }) => {
     try {
       const res = await fetch("/api/admin/users", {
         method: "POST",
@@ -263,19 +263,14 @@ export const AdminAuthProvider: React.FC<{ children: React.ReactNode }> = ({ chi
           addAuditLog(`Created Office Bearer (${data.user.name})`, "User Management", "Success");
           return;
         }
+      } else {
+        const err = await res.json().catch(() => ({}));
+        alert(err.message || "Failed to create Office Bearer in database.");
       }
     } catch (err) {
       console.error("MongoDB Atlas creation error:", err);
+      alert("Network error while creating Office Bearer.");
     }
-
-    // Fallback UI update
-    const newOb: OfficeBearer = {
-      ...obData,
-      id: `ob-${Date.now()}`,
-      joinedDate: new Date().toISOString().split("T")[0],
-    };
-    setOfficeBearers((prev) => [...prev, newOb]);
-    addAuditLog(`Created Office Bearer (${newOb.name})`, "User Management", "Success");
   };
 
   const updateOfficeBearer = async (id: string, updatedData: Partial<OfficeBearer>) => {
@@ -292,40 +287,48 @@ export const AdminAuthProvider: React.FC<{ children: React.ReactNode }> = ({ chi
           addAuditLog(`Updated Office Bearer (${data.user.name})`, "User Management", "Success");
           return;
         }
+      } else {
+        const err = await res.json().catch(() => ({}));
+        alert(err.message || "Failed to update Office Bearer in database.");
       }
     } catch (err) {
       console.error("MongoDB Atlas update error:", err);
+      alert("Network error while updating Office Bearer.");
     }
-
-    setOfficeBearers((prev) =>
-      prev.map((ob) => (ob.id === id ? { ...ob, ...updatedData } : ob))
-    );
-    addAuditLog(`Updated Office Bearer (${id})`, "User Management", "Success");
   };
 
   const deleteOfficeBearer = async (id: string) => {
     try {
-      await fetch(`/api/admin/users?id=${encodeURIComponent(id)}`, { method: "DELETE" });
+      const res = await fetch(`/api/admin/users?id=${encodeURIComponent(id)}`, { method: "DELETE" });
+      if (res.ok) {
+        const target = officeBearers.find((ob) => ob.id === id);
+        setOfficeBearers((prev) => prev.filter((ob) => ob.id !== id));
+        addAuditLog(`Deactivated/Deleted Office Bearer (${target?.name || id})`, "User Management", "Warning");
+      }
     } catch (err) {
       console.error("MongoDB Atlas delete error:", err);
     }
-    const target = officeBearers.find((ob) => ob.id === id);
-    setOfficeBearers((prev) => prev.filter((ob) => ob.id !== id));
-    addAuditLog(`Deactivated/Deleted Office Bearer (${target?.name || id})`, "User Management", "Warning");
   };
 
-  const changeObCredentials = async (id: string) => {
+  const changeObCredentials = async (id: string, newPassword: string) => {
     try {
-      await fetch("/api/admin/users", {
+      const res = await fetch("/api/admin/users", {
         method: "PUT",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ id, newPassword: "ob123_reset" }),
+        body: JSON.stringify({ id, newPassword }),
       });
+      if (res.ok) {
+        const target = officeBearers.find((ob) => ob.id === id);
+        addAuditLog(`Changed Credentials for (${target?.name || id})`, "User Management", "Success");
+        console.log(`✅ [MONGODB] Credentials updated for Office Bearer ID: ${id}`);
+      } else {
+        const err = await res.json().catch(() => ({}));
+        alert(err.message || "Failed to change credentials in database.");
+      }
     } catch (err) {
       console.error("MongoDB Atlas credentials update error:", err);
+      alert("Network error while changing credentials.");
     }
-    const target = officeBearers.find((ob) => ob.id === id);
-    addAuditLog(`Changed Credentials for (${target?.name || id})`, "User Management", "Warning");
   };
 
   // Responsibility Assignment: STRICT 1 OB -> 1 RESPONSIBILITY (MongoDB-persisted)

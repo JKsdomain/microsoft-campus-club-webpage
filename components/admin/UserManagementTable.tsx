@@ -43,17 +43,18 @@ export const UserManagementTable: React.FC = () => {
     setOpenDropdownId(null);
   };
 
-  const handleSaveOb = (obData: {
+  const handleSaveOb = async (obData: {
     name: string;
     email: string;
     department: string;
     responsibility: string;
     status: "Active" | "Inactive";
+    password?: string;
   }) => {
     if (editingOb) {
-      updateOfficeBearer(editingOb.id, obData);
+      await updateOfficeBearer(editingOb.id, obData);
     } else {
-      addOfficeBearer(obData);
+      await addOfficeBearer(obData);
     }
   };
 
