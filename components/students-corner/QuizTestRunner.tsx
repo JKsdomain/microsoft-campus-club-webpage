@@ -201,19 +201,6 @@ export const QuizTestRunner: React.FC<QuizTestRunnerProps> = ({
               <span className="text-2xl font-bold text-red-400">{report.incorrectAnswersCount}</span>
             </div>
           </div>
-
-          <div className="pt-2 flex justify-center">
-            <Button
-              onClick={handleDownloadResultPDF}
-              disabled={isDownloadingPDF}
-              variant="primary"
-              size="md"
-              leftIcon={<Download className="w-4 h-4" />}
-              className="bg-[#0078D4] hover:bg-[#0078D4]/80"
-            >
-              {isDownloadingPDF ? "Generating PDF..." : "Download Result PDF"}
-            </Button>
-          </div>
         </div>
 
         {/* Immediate Quiz Answer & Explanation Breakdown */}

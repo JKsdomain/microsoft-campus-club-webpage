@@ -335,14 +335,6 @@ export const HistoryQuestions: React.FC = () => {
                 >
                   {downloadingId === set.id ? "PDF..." : "Download PDF"}
                 </Button>
-                <Button
-                  onClick={() => setSelectedSet(set)}
-                  variant="primary"
-                  size="md"
-                  leftIcon={<Eye className="w-4 h-4" />}
-                >
-                  View Questions
-                </Button>
               </div>
             </div>
           ))}

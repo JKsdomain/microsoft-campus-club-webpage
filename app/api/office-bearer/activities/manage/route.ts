@@ -129,7 +129,7 @@ export async function POST(req: Request) {
       csvFileName,
       startAt,
       endAt,
-      publishImmediately = true,
+      publishImmediately = false,
     } = body;
 
     if (!type) {

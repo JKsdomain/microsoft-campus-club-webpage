@@ -387,41 +387,8 @@ export const QuizConfiguration: React.FC<QuizConfigurationProps> = ({
     setValidationError(null);
 
     try {
-      // 1. Direct MongoDB persistence and activation
-      const res = await fetch("/api/office-bearer/activities/manage", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          type: activityType,
-          title: title || `${activityType} Assessment`,
-          submittedBy: currentOb.name,
-          authorDepartment: currentOb.department,
-          questions: uploadedQuestions,
-          questionsToUpload,
-          questionsToDisplay,
-          randomQuestions,
-          randomChoices,
-          timerMinutes,
-          questionsDetected: uploadedQuestions.length,
-          csvFileName: csvFileName || `${activityType.toLowerCase().replace(" ", "_")}_active.csv`,
-          startAt: startDateTime.toISOString(),
-          endAt: endDateTime.toISOString(),
-          publishImmediately: true,
-        }),
-      });
-
-      if (res.ok) {
-        setSubmitSuccess(true);
-        setSaveMessage(`${activityType} configuration and all ${uploadedQuestions.length} questions persistently saved and activated in MongoDB!`);
-        if (refreshProposals) refreshProposals();
-        setTimeout(() => setSubmitSuccess(false), 5000);
-      } else {
-        const err = await res.json().catch(() => ({}));
-        setValidationError(err.message || "Failed to persist to database.");
-      }
-
-      // 2. Also register in local/shared OB context submissions
-      submitQuizProposal({
+      // Create a single proposal in PENDING status for Admin Approval
+      await submitQuizProposal({
         type: activityType,
         title: title || `${activityType} Submission`,
         questions: uploadedQuestions,
@@ -431,13 +398,18 @@ export const QuizConfiguration: React.FC<QuizConfigurationProps> = ({
         randomChoices,
         timerMinutes,
         questionsDetected: uploadedQuestions.length,
-        csvFileName: csvFileName || `${activityType.toLowerCase().replace(" ", "_")}_active.csv`,
+        csvFileName: csvFileName || `${activityType.toLowerCase().replace(" ", "_")}_set.csv`,
         startAt: startDateTime.toISOString(),
         endAt: endDateTime.toISOString(),
       });
+
+      setSubmitSuccess(true);
+      setSaveMessage(`${activityType} proposal submitted for Admin approval! Status: Waiting for Approval.`);
+      if (refreshProposals) refreshProposals();
+      setTimeout(() => setSubmitSuccess(false), 5000);
     } catch (e: any) {
-      console.error("Save error:", e);
-      setValidationError("Network error saving configuration to database.");
+      console.error("Submission error:", e);
+      setValidationError("Network error submitting configuration for approval.");
     } finally {
       setIsSaving(false);
     }
@@ -919,7 +891,7 @@ export const QuizConfiguration: React.FC<QuizConfigurationProps> = ({
                 leftIcon={isSaving ? <Loader2 className="w-4 h-4 animate-spin" /> : <Save className="w-4 h-4" />}
                 className="w-full sm:w-auto"
               >
-                {isSaving ? "Saving to MongoDB..." : "Save & Activate in Database"}
+                {isSaving ? "Submitting for Approval..." : "Submit for Admin Approval"}
               </Button>
             </div>
           </form>

@@ -305,16 +305,6 @@ export const PlacementTestRunner: React.FC<PlacementTestRunnerProps> = ({
                 </p>
               </div>
             </div>
-
-            <Button
-              onClick={handleDownloadReport}
-              disabled={isDownloadingPDF}
-              variant="primary"
-              size="md"
-              leftIcon={<Download className="w-4 h-4" />}
-            >
-              {isDownloadingPDF ? "Generating PDF..." : "Download Result PDF"}
-            </Button>
           </div>
 
           {/* Performance Summary Cards */}

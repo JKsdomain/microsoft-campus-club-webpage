@@ -483,7 +483,18 @@ export async function PUT(req: Request) {
           },
         });
       } else {
-        // --- NORMAL APPROVAL (new submission) ---
+        // Archive any previous active proposal of the same type so only the newly approved proposal is active
+        await ProposalModel.updateMany(
+          { type: proposal.type, _id: { $ne: proposal._id }, status: "APPROVED", isActive: true },
+          {
+            $set: {
+              status: "ARCHIVED",
+              isActive: false,
+              archivedAt: new Date(),
+            },
+          }
+        );
+
         const oldStatus = proposal.status;
         proposal.status = "APPROVED";
         proposal.reviewedAt = new Date();
