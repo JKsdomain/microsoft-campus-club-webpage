@@ -94,8 +94,9 @@ export async function POST(req: Request) {
         return NextResponse.json(
           {
             allowed: false,
-            status: "CLOSED",
-            message: `Assessment submission rejected: "${testType}" has ended. Submissions are closed.`,
+            status: "EXPIRED",
+            isExpired: true,
+            message: `Assessment submission rejected: "${testType}" has expired. Submissions are closed.`,
           },
           { status: 403 }
         );
@@ -116,7 +117,8 @@ export async function POST(req: Request) {
         {
           allowed: false,
           status: "CLOSED",
-          message: `Assessment submission rejected: "${testType}" is currently closed.`,
+          isExpired: true,
+          message: `Assessment submission rejected: "${testType}" is currently closed or expired.`,
         },
         { status: 403 }
       );
@@ -210,7 +212,7 @@ export async function POST(req: Request) {
         rollNumber: studentInfo.rollNumber,
         activityId: logicalActivityId,
         activityType: dbType,
-        activityVersion: activeProposal.revisionNumber || 0,
+        activityVersion: activeProposal?.revisionNumber || 0,
         score,
         totalQuestions,
         correctAnswers: correctCount,

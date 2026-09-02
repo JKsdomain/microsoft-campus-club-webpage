@@ -71,9 +71,33 @@ export async function POST(req: Request) {
             return NextResponse.json(
               {
                 allowed: false,
-                status: "CLOSED",
-                message: `"${activityName}" has ended. (Closed at: ${endAt.toLocaleString()})`,
+                status: "EXPIRED",
+                isExpired: true,
+                message: `"${activityName}" assessment has expired. Submissions are closed. (Ended at: ${endAt.toLocaleString()})`,
                 startAt: startAt.toISOString(),
+                endAt: endAt.toISOString(),
+              },
+              { status: 403 }
+            );
+          }
+        }
+      } else {
+        // If no active approved proposal, check if the latest approved or archived proposal has expired
+        const latestProposal = await ProposalModel.findOne({
+          type: dbType,
+          status: { $in: ["APPROVED", "ARCHIVED"] },
+        }).sort({ submittedAt: -1 });
+
+        if (latestProposal && latestProposal.endAt) {
+          const endAt = new Date(latestProposal.endAt);
+          if (now > endAt) {
+            return NextResponse.json(
+              {
+                allowed: false,
+                status: "EXPIRED",
+                isExpired: true,
+                message: `"${activityName}" assessment has expired. Submissions are closed. (Ended at: ${endAt.toLocaleString()})`,
+                startAt: latestProposal.startAt ? new Date(latestProposal.startAt).toISOString() : null,
                 endAt: endAt.toISOString(),
               },
               { status: 403 }
@@ -84,11 +108,13 @@ export async function POST(req: Request) {
 
       // Duplicate attempt check if email is provided
       if (studentEmailNormalized) {
-        const existingAttempt = await TestAttempt.findOne({
+        const query: any = {
           studentEmailNormalized,
           activityId: logicalActivityId,
           status: { $in: ["COMPLETED", "SUBMITTED"] },
-        });
+        };
+
+        const existingAttempt = await TestAttempt.findOne(query);
 
         if (existingAttempt) {
           return NextResponse.json(
@@ -142,7 +168,8 @@ export async function POST(req: Request) {
         {
           allowed: false,
           status: "CLOSED",
-          message: `"${activityName}" is currently closed by the administrator. Access is not permitted.`,
+          isExpired: true,
+          message: `"${activityName}" is currently closed or expired. Access is not permitted.`,
         },
         { status: 403 }
       );

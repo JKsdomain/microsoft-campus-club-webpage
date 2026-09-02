@@ -17,6 +17,7 @@ import {
   AlertTriangle,
   X,
   Clock,
+  Loader2,
 } from "lucide-react";
 import { StudentInfoModal } from "@/components/students-corner/StudentInfoModal";
 import { PlacementTestRunner } from "@/components/students-corner/PlacementTestRunner";
@@ -85,8 +86,17 @@ function StudentsCornerInner() {
   // Activity Availability State & Enforcement
   const [activityAvailability, setActivityAvailability] = useState<ActivityAvailabilityMap>(INITIAL_ACTIVITY_AVAILABILITY);
   const [timelines, setTimelines] = useState<Record<string, { startAt?: string | null; endAt?: string | null; title?: string }>>({});
-  const [blockedMessage, setBlockedMessage] = useState<string | null>(null);
   const [testInfoPreviewOpen, setTestInfoPreviewOpen] = useState(false);
+  const [isValidatingTest, setIsValidatingTest] = useState<string | null>(null);
+
+  interface AvailabilityModalState {
+    isOpen: boolean;
+    type: "EXPIRED" | "CLOSED" | "UPCOMING" | "ERROR";
+    title: string;
+    message: string;
+    details?: string | null;
+  }
+  const [availabilityNotice, setAvailabilityNotice] = useState<AvailabilityModalState | null>(null);
 
   const fetchAvailability = async () => {
     try {
@@ -145,7 +155,37 @@ function StudentsCornerInner() {
   } | null>(null);
 
   const handleStartTestFlow = async (testType: "Placement Questions" | "General Quiz") => {
-    // 1. Live backend verification from MongoDB
+    // 0. Quick client-side check if known to be expired or closed
+    const currentStatus = activityAvailability[testType] || "OPEN";
+    const timeline = timelines[testType];
+    const isClientExpired = timeline?.endAt && new Date() > new Date(timeline.endAt);
+
+    if (currentStatus === "CLOSED" || isClientExpired) {
+      const endText = timeline?.endAt ? ` (Ended on ${formatTimelineDisplay(timeline.endAt)})` : "";
+      setAvailabilityNotice({
+        isOpen: true,
+        type: "EXPIRED",
+        title: testType === "Placement Questions" ? "Placement Question is Expired" : `${testType} is Expired`,
+        message: `This ${testType.toLowerCase()} assessment has expired and submissions are now closed.${endText} Please check back later for upcoming rounds.`,
+        details: timeline?.endAt ? `Closed: ${formatTimelineDisplay(timeline.endAt)}` : null,
+      });
+      return;
+    }
+
+    if (currentStatus === "COMING SOON" || currentStatus === "UPCOMING") {
+      const startText = timeline?.startAt ? ` (Opens at ${formatTimelineDisplay(timeline.startAt)})` : "";
+      setAvailabilityNotice({
+        isOpen: true,
+        type: "UPCOMING",
+        title: `${testType} Not Started Yet`,
+        message: `This ${testType.toLowerCase()} assessment has not started yet.${startText} Please check back at the scheduled start time.`,
+        details: timeline?.startAt ? `Opens: ${formatTimelineDisplay(timeline.startAt)}` : null,
+      });
+      return;
+    }
+
+    // 1. Live backend verification from MongoDB BEFORE entering details
+    setIsValidatingTest(testType);
     try {
       const res = await fetch("/api/students-corner/validate-event", {
         method: "POST",
@@ -153,11 +193,43 @@ function StudentsCornerInner() {
         body: JSON.stringify({ activityName: testType }),
       });
       const data = await res.json();
+      setIsValidatingTest(null);
+
       if (!res.ok || !data.allowed) {
-        setBlockedMessage(data.message || `"${testType}" is currently closed by the administrator.`);
         setActivityAvailability((prev) => ({ ...prev, [testType]: data.status || "CLOSED" }));
+
+        // Specifically check for EXPIRED status / message
+        if (data.isExpired || data.status === "EXPIRED" || (data.message && data.message.toLowerCase().includes("ended"))) {
+          setAvailabilityNotice({
+            isOpen: true,
+            type: "EXPIRED",
+            title: testType === "Placement Questions" ? "Placement Question is Expired" : `${testType} is Expired`,
+            message: data.message || `This ${testType.toLowerCase()} assessment has expired. Submissions are closed.`,
+            details: data.endAt ? `Closed: ${formatTimelineDisplay(data.endAt)}` : null,
+          });
+          return;
+        }
+
+        if (data.status === "UPCOMING") {
+          setAvailabilityNotice({
+            isOpen: true,
+            type: "UPCOMING",
+            title: `${testType} Not Started Yet`,
+            message: data.message || `This assessment has not started yet.`,
+            details: data.startAt ? `Opens: ${formatTimelineDisplay(data.startAt)}` : null,
+          });
+          return;
+        }
+
+        setAvailabilityNotice({
+          isOpen: true,
+          type: "CLOSED",
+          title: `${testType} Unavailable`,
+          message: data.message || `"${testType}" is currently closed by the administrator.`,
+        });
         return;
       }
+
       if (data.questions || data.testTitle || data.timerMinutes) {
         setCurrentEventData({
           testTitle: data.testTitle,
@@ -167,24 +239,18 @@ function StudentsCornerInner() {
         });
       }
     } catch (err) {
+      setIsValidatingTest(null);
       console.error("Availability validation network error:", err);
-    }
-
-    const status = activityAvailability[testType] || "OPEN";
-
-    if (status === "CLOSED") {
-      const endText = timelines[testType]?.endAt ? ` (Closed at ${formatTimelineDisplay(timelines[testType]?.endAt)})` : "";
-      setBlockedMessage(`"${testType}" is currently closed.${endText}`);
+      setAvailabilityNotice({
+        isOpen: true,
+        type: "ERROR",
+        title: "Connection Error",
+        message: "Unable to verify activity availability right now. Please check your network connection and try again.",
+      });
       return;
     }
 
-    if (status === "COMING SOON" || status === "UPCOMING") {
-      const startText = timelines[testType]?.startAt ? ` (Opens at ${formatTimelineDisplay(timelines[testType]?.startAt)})` : "";
-      setBlockedMessage(`"${testType}" has not started yet.${startText}`);
-      return;
-    }
-
-    setBlockedMessage(null);
+    setAvailabilityNotice(null);
     setTargetTestType(testType);
     setTestInfoPreviewOpen(true);
   };
@@ -358,11 +424,18 @@ function StudentsCornerInner() {
                       onClick={() => handleStartTestFlow("Placement Questions")}
                       variant="primary"
                       size="md"
-                      disabled={status === "CLOSED" || status === "UPCOMING" || status === "COMING SOON"}
-                      rightIcon={<ArrowRight className="w-4 h-4" />}
-                      className={status !== "OPEN" ? "opacity-60 cursor-not-allowed" : ""}
+                      disabled={isValidatingTest === "Placement Questions"}
+                      leftIcon={isValidatingTest === "Placement Questions" ? <Loader2 className="w-4 h-4 animate-spin" /> : undefined}
+                      rightIcon={isValidatingTest !== "Placement Questions" ? <ArrowRight className="w-4 h-4" /> : undefined}
+                      className={status !== "OPEN" ? "opacity-75" : ""}
                     >
-                      {status === "OPEN" ? "Start Placement Test" : status === "UPCOMING" ? "Upcoming Assessment" : "Assessment Closed"}
+                      {isValidatingTest === "Placement Questions"
+                        ? "Verifying..."
+                        : status === "OPEN"
+                        ? "Start Placement Test"
+                        : status === "UPCOMING"
+                        ? "Upcoming Assessment"
+                        : "Assessment Closed"}
                     </Button>
                   </div>
                 );
@@ -426,11 +499,18 @@ function StudentsCornerInner() {
                       onClick={() => handleStartTestFlow("General Quiz")}
                       variant="primary"
                       size="md"
-                      disabled={status === "CLOSED" || status === "UPCOMING" || status === "COMING SOON"}
-                      rightIcon={<ArrowRight className="w-4 h-4" />}
-                      className={status !== "OPEN" ? "opacity-60 cursor-not-allowed" : ""}
+                      disabled={isValidatingTest === "General Quiz"}
+                      leftIcon={isValidatingTest === "General Quiz" ? <Loader2 className="w-4 h-4 animate-spin" /> : undefined}
+                      rightIcon={isValidatingTest !== "General Quiz" ? <ArrowRight className="w-4 h-4" /> : undefined}
+                      className={status !== "OPEN" ? "opacity-75" : ""}
                     >
-                      {status === "OPEN" ? "Take General Quiz" : status === "UPCOMING" ? "Upcoming Quiz" : "Quiz Closed"}
+                      {isValidatingTest === "General Quiz"
+                        ? "Verifying..."
+                        : status === "OPEN"
+                        ? "Take General Quiz"
+                        : status === "UPCOMING"
+                        ? "Upcoming Quiz"
+                        : "Quiz Closed"}
                     </Button>
                   </div>
                 );
@@ -550,9 +630,11 @@ function StudentsCornerInner() {
                   onClick={() => handleStartTestFlow("Placement Questions")}
                   variant="primary"
                   size="lg"
-                  rightIcon={<ArrowRight className="w-4 h-4" />}
+                  disabled={isValidatingTest === "Placement Questions"}
+                  leftIcon={isValidatingTest === "Placement Questions" ? <Loader2 className="w-4 h-4 animate-spin" /> : undefined}
+                  rightIcon={isValidatingTest !== "Placement Questions" ? <ArrowRight className="w-4 h-4" /> : undefined}
                 >
-                  Enter Details & Start Test
+                  {isValidatingTest === "Placement Questions" ? "Checking Availability..." : "Enter Details & Start Test"}
                 </Button>
               </div>
             ) : (
@@ -630,9 +712,11 @@ function StudentsCornerInner() {
                   onClick={() => handleStartTestFlow("General Quiz")}
                   variant="primary"
                   size="lg"
-                  rightIcon={<ArrowRight className="w-4 h-4" />}
+                  disabled={isValidatingTest === "General Quiz"}
+                  leftIcon={isValidatingTest === "General Quiz" ? <Loader2 className="w-4 h-4 animate-spin" /> : undefined}
+                  rightIcon={isValidatingTest !== "General Quiz" ? <ArrowRight className="w-4 h-4" /> : undefined}
                 >
-                  Enter Details & Start Quiz
+                  {isValidatingTest === "General Quiz" ? "Checking Availability..." : "Enter Details & Start Quiz"}
                 </Button>
               </div>
             ) : (
@@ -801,28 +885,67 @@ function StudentsCornerInner() {
       <StudentInfoModal
         isOpen={studentInfoModalOpen}
         testType={targetTestType}
-        testTitle={targetTestType === "Placement Questions" ? ACTIVE_PLACEMENT_SET.title : ACTIVE_QUIZ_SET.title}
+        testTitle={currentEventData?.testTitle || (targetTestType === "Placement Questions" ? ACTIVE_PLACEMENT_SET.title : ACTIVE_QUIZ_SET.title)}
         onClose={() => setStudentInfoModalOpen(false)}
         onProceed={handleStudentInfoProceed}
+        onExpired={(msg) => {
+          setAvailabilityNotice({
+            isOpen: true,
+            type: "EXPIRED",
+            title: targetTestType === "Placement Questions" ? "Placement Question is Expired" : `${targetTestType} is Expired`,
+            message: msg,
+          });
+        }}
       />
 
-      {/* Activity Availability Blocked Notice Modal */}
-      {blockedMessage && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/75 backdrop-blur-sm animate-fade-in">
-          <div className="w-full max-w-md rounded-2xl bg-[#0D1B2A] border border-white/15 p-6 shadow-2xl space-y-4 text-center">
-            <div className="w-12 h-12 rounded-full bg-amber-500/10 border border-amber-500/20 text-amber-400 flex items-center justify-center mx-auto">
-              <AlertTriangle className="w-6 h-6" />
+      {/* Activity Availability Dialog Box Modal */}
+      {availabilityNotice?.isOpen && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/80 backdrop-blur-sm animate-fade-in">
+          <div className="w-full max-w-md rounded-2xl bg-[#0D1B2A] border border-white/15 p-6 sm:p-7 shadow-2xl space-y-5 text-center relative">
+            <button
+              onClick={() => setAvailabilityNotice(null)}
+              className="absolute top-4 right-4 text-[#94A3B8] hover:text-[#F8FAFC] p-1 rounded-lg hover:bg-white/5 transition-colors"
+            >
+              <X className="w-5 h-5" />
+            </button>
+
+            {availabilityNotice.type === "EXPIRED" && (
+              <div className="w-14 h-14 rounded-2xl bg-rose-500/15 border border-rose-500/30 text-rose-400 flex items-center justify-center mx-auto shadow-lg shadow-rose-500/10">
+                <Clock className="w-7 h-7" />
+              </div>
+            )}
+            {availabilityNotice.type === "UPCOMING" && (
+              <div className="w-14 h-14 rounded-2xl bg-amber-500/15 border border-amber-500/30 text-amber-400 flex items-center justify-center mx-auto shadow-lg shadow-amber-500/10">
+                <Clock className="w-7 h-7" />
+              </div>
+            )}
+            {(availabilityNotice.type === "CLOSED" || availabilityNotice.type === "ERROR") && (
+              <div className="w-14 h-14 rounded-2xl bg-amber-500/15 border border-amber-500/30 text-amber-400 flex items-center justify-center mx-auto shadow-lg shadow-amber-500/10">
+                <AlertTriangle className="w-7 h-7" />
+              </div>
+            )}
+
+            <div className="space-y-2">
+              <h3 className="text-xl font-bold text-[#F8FAFC]">
+                {availabilityNotice.title}
+              </h3>
+              <p className="text-xs sm:text-sm text-[#CBD5E1] leading-relaxed">
+                {availabilityNotice.message}
+              </p>
             </div>
-            <h3 className="text-lg font-bold text-[#F8FAFC]">Activity Unavailable</h3>
-            <p className="text-sm text-[#CBD5E1] leading-relaxed">
-              {blockedMessage}
-            </p>
+
+            {availabilityNotice.details && (
+              <div className="p-2.5 rounded-xl bg-[#07111F] border border-white/10 text-xs font-mono text-[#94A3B8]">
+                {availabilityNotice.details}
+              </div>
+            )}
+
             <div className="pt-2">
               <Button
-                variant="primary"
+                variant={availabilityNotice.type === "EXPIRED" ? "primary" : "outline"}
                 size="md"
-                className="w-full"
-                onClick={() => setBlockedMessage(null)}
+                className={`w-full ${availabilityNotice.type === "EXPIRED" ? "bg-rose-600 hover:bg-rose-700 text-white" : ""}`}
+                onClick={() => setAvailabilityNotice(null)}
               >
                 Understand & Close
               </Button>

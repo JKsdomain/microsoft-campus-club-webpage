@@ -11,6 +11,7 @@ interface StudentInfoModalProps {
   testTitle: string;
   onClose: () => void;
   onProceed: (studentInfo: StudentInfo) => void;
+  onExpired?: (message: string) => void;
 }
 
 export const StudentInfoModal: React.FC<StudentInfoModalProps> = ({
@@ -19,6 +20,7 @@ export const StudentInfoModal: React.FC<StudentInfoModalProps> = ({
   testTitle,
   onClose,
   onProceed,
+  onExpired,
 }) => {
   const [name, setName] = useState("");
   const [department, setDepartment] = useState<string>(STUDENT_DEPARTMENTS[0]);
@@ -97,6 +99,15 @@ export const StudentInfoModal: React.FC<StudentInfoModalProps> = ({
       const data = await res.json();
 
       if (!res.ok || !data.allowed) {
+        if (data.isExpired || data.status === "EXPIRED" || (data.status === "CLOSED" && data.message?.toLowerCase().includes("ended"))) {
+          setIsChecking(false);
+          if (onExpired) {
+            onExpired(data.message || `"${testType}" assessment has expired. Submissions are closed.`);
+            onClose();
+            return;
+          }
+        }
+
         if (data.code === "ALREADY_ATTEMPTED") {
           setError("You have already attempted this test. Only one attempt is allowed per student.");
         } else {

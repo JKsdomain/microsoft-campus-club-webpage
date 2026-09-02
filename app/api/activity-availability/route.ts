@@ -54,6 +54,23 @@ export async function GET() {
       } else {
         availabilityMap["General Quiz"] = "CLOSED";
       }
+    } else if (!activeQuiz) {
+      const latestQuiz = await ProposalModel.findOne({
+        type: "GENERAL_QUIZ",
+        status: { $in: ["APPROVED", "ARCHIVED"] },
+      }).sort({ submittedAt: -1 });
+
+      if (latestQuiz && latestQuiz.endAt) {
+        const quizEnd = new Date(latestQuiz.endAt);
+        if (now > quizEnd) {
+          timelines["General Quiz"] = {
+            startAt: latestQuiz.startAt ? new Date(latestQuiz.startAt).toISOString() : null,
+            endAt: quizEnd.toISOString(),
+            title: latestQuiz.title,
+          };
+          availabilityMap["General Quiz"] = "CLOSED";
+        }
+      }
     }
 
     // Calculate Placement Questions dynamic availability from timeline
@@ -73,6 +90,23 @@ export async function GET() {
         availabilityMap["Placement Questions"] = "OPEN";
       } else {
         availabilityMap["Placement Questions"] = "CLOSED";
+      }
+    } else if (!activePlacement) {
+      const latestPlacement = await ProposalModel.findOne({
+        type: "PLACEMENT_QUESTIONS",
+        status: { $in: ["APPROVED", "ARCHIVED"] },
+      }).sort({ submittedAt: -1 });
+
+      if (latestPlacement && latestPlacement.endAt) {
+        const placementEnd = new Date(latestPlacement.endAt);
+        if (now > placementEnd) {
+          timelines["Placement Questions"] = {
+            startAt: latestPlacement.startAt ? new Date(latestPlacement.startAt).toISOString() : null,
+            endAt: placementEnd.toISOString(),
+            title: latestPlacement.title,
+          };
+          availabilityMap["Placement Questions"] = "CLOSED";
+        }
       }
     }
 

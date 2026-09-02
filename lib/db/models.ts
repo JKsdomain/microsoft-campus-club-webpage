@@ -302,8 +302,8 @@ const TestAttemptSchema = new Schema(
     section: { type: String, required: true },
     rollNumber: { type: String, required: true },
 
-    // Activity Details (activityId is the logical root proposal ID)
-    activityId: { type: Schema.Types.ObjectId, required: true, index: true },
+    // Activity Details (activityId is the logical root proposal ID or string identifier)
+    activityId: { type: Schema.Types.Mixed, required: true, index: true },
     activityType: {
       type: String,
       enum: ["GENERAL_QUIZ", "PLACEMENT_QUESTIONS"],
@@ -344,7 +344,7 @@ const TestAttemptSchema = new Schema(
 
     // Backward-compatibility legacy fields
     testType: { type: String, default: null },
-    testId: { type: Schema.Types.ObjectId, default: null },
+    testId: { type: Schema.Types.Mixed, default: null },
     participant: {
       username: { type: String, default: null },
       email: { type: String, default: null },
@@ -363,7 +363,7 @@ TestAttemptSchema.index({ studentEmailNormalized: 1, activityId: 1 }, { unique: 
 const TestAnswerSchema = new Schema(
   {
     attemptId: { type: Schema.Types.ObjectId, ref: "test_attempts", required: true, index: true },
-    questionId: { type: Schema.Types.ObjectId, required: true, index: true },
+    questionId: { type: Schema.Types.Mixed, required: true, index: true },
     selectedAnswer: { type: String, required: true },
     isCorrect: { type: Boolean, required: true }, // CALCULATED SERVER-SIDE ONLY
     answeredAt: { type: Date, default: Date.now },
