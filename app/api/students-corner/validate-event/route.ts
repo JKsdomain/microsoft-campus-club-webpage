@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import { dbConnect } from "@/lib/db/dbConnect";
 import { SystemSetting, ProposalModel, TestAttempt } from "@/lib/db/models";
+import { ACTIVE_PLACEMENT_SET, ACTIVE_QUIZ_SET } from "@/lib/studentState";
 
 // POST /api/students-corner/validate-event
 // Body: { activityName: "Placement Questions" | "General Quiz" | "Technical Games", email?: string }
@@ -129,23 +130,34 @@ export async function POST(req: Request) {
         }
       }
 
-      // If active proposal exists, return its details
+      // If active proposal exists, return its details respecting questionsToDisplay and randomization
       if (activeProposal) {
-        const publicQuestions = (activeProposal.questions && Array.isArray(activeProposal.questions) && activeProposal.questions.length > 0)
-          ? activeProposal.questions.map((q: any) => ({
-              id: q.id,
-              question: q.question,
-              options: q.options || [],
-            }))
-          : null;
+        let pool = Array.isArray(activeProposal.questions) ? [...activeProposal.questions] : [];
+        if (activeProposal.randomQuestions) {
+          pool.sort(() => Math.random() - 0.5);
+        }
+        const displayLimit = activeProposal.questionsToDisplay || pool.length || (activityName === "Placement Questions" ? 4 : 3);
+        const selected = pool.slice(0, displayLimit);
+
+        const publicQuestions = selected.map((q: any) => {
+          let opts = Array.isArray(q.options) ? [...q.options] : [];
+          if (activeProposal.randomChoices) {
+            opts.sort(() => Math.random() - 0.5);
+          }
+          return {
+            id: q.id,
+            question: q.question,
+            options: opts,
+          };
+        });
 
         return NextResponse.json({
           allowed: true,
           status: "OPEN",
           activityId: logicalActivityId,
           testTitle: activeProposal.title || (activityName === "Placement Questions" ? "Placement Assessment" : "General Quiz Challenge"),
-          timerMinutes: activeProposal.timerMinutes || 30,
-          totalQuestions: activeProposal.questionsToDisplay || (publicQuestions ? publicQuestions.length : 4),
+          timerMinutes: activeProposal.timerMinutes || (activityName === "Placement Questions" ? 30 : 15),
+          totalQuestions: publicQuestions.length,
           questions: publicQuestions,
           startAt: activeProposal.startAt ? new Date(activeProposal.startAt).toISOString() : null,
           endAt: activeProposal.endAt ? new Date(activeProposal.endAt).toISOString() : null,
@@ -186,7 +198,19 @@ export async function POST(req: Request) {
       );
     }
 
-    return NextResponse.json({ allowed: true, status: "OPEN" });
+    const fallbackQuestions = activityName === "Placement Questions" ? ACTIVE_PLACEMENT_SET.questions : ACTIVE_QUIZ_SET.questions;
+    const fallbackTitle = activityName === "Placement Questions" ? ACTIVE_PLACEMENT_SET.title : ACTIVE_QUIZ_SET.title;
+    const fallbackTimer = activityName === "Placement Questions" ? ACTIVE_PLACEMENT_SET.timerMinutes : ACTIVE_QUIZ_SET.timerMinutes;
+
+    return NextResponse.json({
+      allowed: true,
+      status: "OPEN",
+      activityId: activityName === "Placement Questions" ? "default-placement" : "default-quiz",
+      testTitle: fallbackTitle,
+      timerMinutes: fallbackTimer,
+      totalQuestions: fallbackQuestions.length,
+      questions: fallbackQuestions.map((q: any) => ({ id: q.id, question: q.question, options: q.options })),
+    });
   } catch (error: any) {
     console.error("❌ [API /validate-event] Error:", error);
     return NextResponse.json(

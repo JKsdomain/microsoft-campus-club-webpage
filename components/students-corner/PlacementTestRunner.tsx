@@ -435,6 +435,11 @@ export const PlacementTestRunner: React.FC<PlacementTestRunnerProps> = ({
             <Lock className="w-3 h-3" />
             <span>Secure Test Mode</span>
           </div>
+          {testTitle && (
+            <span className="text-xs font-semibold text-[#CBD5E1] hidden md:block truncate max-w-[200px]">
+              {testTitle}
+            </span>
+          )}
         </div>
 
         <div className="flex items-center space-x-3">

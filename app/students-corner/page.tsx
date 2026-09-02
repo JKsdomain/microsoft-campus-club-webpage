@@ -85,7 +85,19 @@ function StudentsCornerInner() {
 
   // Activity Availability State & Enforcement
   const [activityAvailability, setActivityAvailability] = useState<ActivityAvailabilityMap>(INITIAL_ACTIVITY_AVAILABILITY);
-  const [timelines, setTimelines] = useState<Record<string, { startAt?: string | null; endAt?: string | null; title?: string }>>({});
+  const [timelines, setTimelines] = useState<
+    Record<
+      string,
+      {
+        startAt?: string | null;
+        endAt?: string | null;
+        title?: string;
+        timerMinutes?: number;
+        questionsToDisplay?: number;
+        totalQuestions?: number;
+      }
+    >
+  >({});
   const [testInfoPreviewOpen, setTestInfoPreviewOpen] = useState(false);
   const [isValidatingTest, setIsValidatingTest] = useState<string | null>(null);
 
@@ -398,7 +410,7 @@ function StudentsCornerInner() {
                       </div>
                       <div>
                         <span className="text-[11px] font-mono text-[#0078D4] block mb-0.5">Placement Challenge</span>
-                        <h3 className="text-lg font-bold text-[#F8FAFC]">Placement Questions</h3>
+                        <h3 className="text-lg font-bold text-[#F8FAFC]">{timeline?.title || "Placement Questions"}</h3>
                         {/* Timeline Information */}
                         {status === "OPEN" && timeline?.endAt && (
                           <span className="text-[11px] font-mono text-emerald-400 block mt-0.5">
@@ -417,7 +429,7 @@ function StudentsCornerInner() {
                         )}
                       </div>
                       <p className="text-xs text-[#CBD5E1] leading-relaxed">
-                        Practice interview coding sets (4 Questions • 30 Minutes) with instant score calculation and question breakdown.
+                        Practice interview coding sets ({timeline?.questionsToDisplay || 4} Questions • {timeline?.timerMinutes || 30} Minutes) with instant score calculation and question breakdown.
                       </p>
                     </div>
                     <Button
@@ -473,7 +485,7 @@ function StudentsCornerInner() {
                       </div>
                       <div>
                         <span className="text-[11px] font-mono text-blue-400 block mb-0.5">Weekly Challenge</span>
-                        <h3 className="text-lg font-bold text-[#F8FAFC]">General Quiz</h3>
+                        <h3 className="text-lg font-bold text-[#F8FAFC]">{timeline?.title || "General Quiz"}</h3>
                         {/* Timeline Information */}
                         {status === "OPEN" && timeline?.endAt && (
                           <span className="text-[11px] font-mono text-emerald-400 block mt-0.5">
@@ -492,7 +504,7 @@ function StudentsCornerInner() {
                         )}
                       </div>
                       <p className="text-xs text-[#CBD5E1] leading-relaxed">
-                        Timed trivia speed rounds (3 Questions • 15 Minutes) covering cloud fundamentals, AI models, and software engineering.
+                        Timed trivia speed rounds ({timeline?.questionsToDisplay || 3} Questions • {timeline?.timerMinutes || 15} Minutes) covering cloud fundamentals, AI models, and software engineering.
                       </p>
                     </div>
                     <Button
@@ -616,9 +628,11 @@ function StudentsCornerInner() {
               <div className="p-12 text-center rounded-2xl bg-[#0D1B2A] border border-white/10 max-w-xl mx-auto space-y-5">
                 <BriefcaseBusiness className="w-12 h-12 text-[#0078D4] mx-auto" />
                 <div>
-                  <h3 className="text-2xl font-bold text-[#F8FAFC]">Placement Questions Assessment</h3>
+                  <h3 className="text-2xl font-bold text-[#F8FAFC]">
+                    {timelines["Placement Questions"]?.title || "Placement Questions Assessment"}
+                  </h3>
                   <p className="text-xs text-[#CBD5E1] mt-1">
-                    {ACTIVE_PLACEMENT_SET.title} • {ACTIVE_PLACEMENT_SET.timerMinutes} Minutes
+                    {timelines["Placement Questions"]?.questionsToDisplay || 4} Questions • {timelines["Placement Questions"]?.timerMinutes || ACTIVE_PLACEMENT_SET.timerMinutes} Minutes
                   </p>
                   {timelines["Placement Questions"]?.endAt && (
                     <p className="text-xs text-emerald-400 mt-1 font-mono">
@@ -698,9 +712,11 @@ function StudentsCornerInner() {
               <div className="p-12 text-center rounded-2xl bg-[#0D1B2A] border border-white/10 max-w-xl mx-auto space-y-5">
                 <CircleHelp className="w-12 h-12 text-blue-400 mx-auto" />
                 <div>
-                  <h3 className="text-2xl font-bold text-[#F8FAFC]">General Quiz Trivia</h3>
+                  <h3 className="text-2xl font-bold text-[#F8FAFC]">
+                    {timelines["General Quiz"]?.title || "General Quiz Trivia"}
+                  </h3>
                   <p className="text-xs text-[#CBD5E1] mt-1">
-                    {ACTIVE_QUIZ_SET.title} • {ACTIVE_QUIZ_SET.timerMinutes} Minutes
+                    {timelines["General Quiz"]?.questionsToDisplay || 3} Questions • {timelines["General Quiz"]?.timerMinutes || ACTIVE_QUIZ_SET.timerMinutes} Minutes
                   </p>
                   {timelines["General Quiz"]?.endAt && (
                     <p className="text-xs text-emerald-400 mt-1 font-mono">
@@ -722,6 +738,9 @@ function StudentsCornerInner() {
             ) : (
               <QuizTestRunner
                 studentInfo={studentInfo}
+                customQuestions={currentEventData?.questions}
+                timerMinutes={currentEventData?.timerMinutes}
+                testTitle={currentEventData?.testTitle}
                 onFinishTest={handleTestFinished}
               />
             )}
@@ -813,15 +832,21 @@ function StudentsCornerInner() {
               <div>
                 <span className="text-[#94A3B8] block text-[10px] font-mono uppercase">Questions</span>
                 <span className="font-bold text-[#F8FAFC]">
-                  {targetTestType === "Placement Questions" ? "4 Questions" : "3 Questions"}
+                  {currentEventData?.totalQuestions
+                    ? `${currentEventData.totalQuestions} Questions`
+                    : targetTestType === "Placement Questions"
+                    ? `${timelines["Placement Questions"]?.questionsToDisplay || 4} Questions`
+                    : `${timelines["General Quiz"]?.questionsToDisplay || 3} Questions`}
                 </span>
               </div>
               <div>
                 <span className="text-[#94A3B8] block text-[10px] font-mono uppercase">Duration</span>
                 <span className="font-bold text-[#22D3EE]">
-                  {targetTestType === "Placement Questions"
-                    ? `${ACTIVE_PLACEMENT_SET.timerMinutes} Minutes`
-                    : `${ACTIVE_QUIZ_SET.timerMinutes} Minutes`}
+                  {currentEventData?.timerMinutes
+                    ? `${currentEventData.timerMinutes} Minutes`
+                    : targetTestType === "Placement Questions"
+                    ? `${timelines["Placement Questions"]?.timerMinutes || ACTIVE_PLACEMENT_SET.timerMinutes} Minutes`
+                    : `${timelines["General Quiz"]?.timerMinutes || ACTIVE_QUIZ_SET.timerMinutes} Minutes`}
                 </span>
               </div>
               <div>

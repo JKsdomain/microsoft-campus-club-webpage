@@ -174,8 +174,18 @@ export async function POST(req: Request) {
 
     let correctCount = 0;
     const answersMap = userAnswers || {};
+    const answeredKeys = Object.keys(answersMap);
 
-    const questionSnapshot = questionList.map((q) => {
+    // If the student was served a subset of questions (e.g. questionsToDisplay), evaluate against the served questions
+    let evaluatedQuestions = questionList;
+    if (answeredKeys.length > 0) {
+      const matching = questionList.filter((q) => answeredKeys.includes(String(q.id)));
+      if (matching.length > 0) {
+        evaluatedQuestions = matching;
+      }
+    }
+
+    const questionSnapshot = evaluatedQuestions.map((q) => {
       const selected = answersMap[q.id] || "No Answer Selected";
       const isCorrect = selected === q.correctAnswer;
       if (isCorrect) correctCount++;
@@ -190,12 +200,10 @@ export async function POST(req: Request) {
       };
     });
 
-    const totalQuestions = questionList.length;
-    const score = testType === "Placement Questions"
-      ? correctCount * 25
-      : Math.round((correctCount / totalQuestions) * 100);
+    const totalQuestions = evaluatedQuestions.length > 0 ? evaluatedQuestions.length : 1;
     const percentage = Math.round((correctCount / totalQuestions) * 100);
-    const wrongCount = totalQuestions - correctCount;
+    const score = percentage;
+    const wrongCount = Math.max(0, totalQuestions - correctCount);
 
     const startedAtDate = startedAt ? new Date(startedAt) : new Date();
 

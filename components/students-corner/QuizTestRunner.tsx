@@ -15,6 +15,9 @@ interface QuizTestRunnerProps {
   studentInfo?: StudentInfo;
   username?: string;
   email?: string;
+  customQuestions?: { id: string; question: string; options: string[] }[];
+  timerMinutes?: number;
+  testTitle?: string;
   onFinishTest: (report: StudentResultReport) => void;
 }
 
@@ -22,6 +25,9 @@ export const QuizTestRunner: React.FC<QuizTestRunnerProps> = ({
   studentInfo,
   username,
   email,
+  customQuestions,
+  timerMinutes,
+  testTitle,
   onFinishTest,
 }) => {
   const effectiveStudentInfo: StudentInfo = studentInfo || {
@@ -35,12 +41,16 @@ export const QuizTestRunner: React.FC<QuizTestRunnerProps> = ({
 
   const [currentIdx, setCurrentIdx] = useState(0);
   const [userAnswers, setUserAnswers] = useState<Record<string, string>>({});
-  const totalDuration = ACTIVE_QUIZ_SET.timerMinutes * 60;
+  const totalDuration = (timerMinutes || ACTIVE_QUIZ_SET.timerMinutes) * 60;
   const [timeLeftSeconds, setTimeLeftSeconds] = useState(totalDuration);
   const [report, setReport] = useState<StudentResultReport | null>(null);
 
   // Stabilize questions array so ordering and choices never regenerate on re-renders
-  const [questions] = useState(() => getPublicQuizQuestions());
+  const publicQuestions = (customQuestions && Array.isArray(customQuestions) && customQuestions.length > 0)
+    ? customQuestions
+    : getPublicQuizQuestions();
+
+  const [questions] = useState(() => publicQuestions);
 
   // Timestamp-based elapsed timer to maintain accurate countdown across tab/window switches
   const startTimeRef = React.useRef<number | null>(null);
@@ -273,7 +283,7 @@ export const QuizTestRunner: React.FC<QuizTestRunnerProps> = ({
             Q {currentIdx + 1} / {questions.length}
           </span>
           <h3 className="text-sm font-bold text-[#F8FAFC] hidden sm:block">
-            {ACTIVE_QUIZ_SET.title}
+            {testTitle || ACTIVE_QUIZ_SET.title}
           </h3>
         </div>
 

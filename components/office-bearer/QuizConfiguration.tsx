@@ -1,7 +1,7 @@
 "use client";
 
-import React, { useState } from "react";
-import { UploadCloud, FileText, CheckCircle2, AlertCircle, Send, Clock, Calendar, ArrowRight, RefreshCw, X } from "lucide-react";
+import React, { useState, useEffect } from "react";
+import { UploadCloud, FileText, CheckCircle2, AlertCircle, Send, Clock, Calendar, ArrowRight, RefreshCw, X, Plus, Trash2, Edit3, Loader2, Save, Database, Layers } from "lucide-react";
 import { useOBAuth } from "./OBAuthProvider";
 import { UnauthorizedGuard } from "./UnauthorizedGuard";
 import { Button } from "../ui/Button";
@@ -14,7 +14,7 @@ interface QuizConfigurationProps {
 export const QuizConfiguration: React.FC<QuizConfigurationProps> = ({
   activityType,
 }) => {
-  const { hasResponsibility, submitQuizProposal, submissions, extendDeadline } = useOBAuth();
+  const { hasResponsibility, submitQuizProposal, submissions, extendDeadline, currentOb, refreshProposals } = useOBAuth();
 
   // Check authorization permission
   const isAssigned = hasResponsibility(activityType);
@@ -45,8 +45,22 @@ export const QuizConfiguration: React.FC<QuizConfigurationProps> = ({
   const [validationError, setValidationError] = useState<string | null>(null);
   const [isValidated, setIsValidated] = useState<boolean>(false);
 
-  // Submission Toast / Feedback
+  // Submission / Save Toast Feedback
   const [submitSuccess, setSubmitSuccess] = useState<boolean>(false);
+  const [saveMessage, setSaveMessage] = useState<string | null>(null);
+  const [isLoadingDb, setIsLoadingDb] = useState<boolean>(true);
+  const [isSaving, setIsSaving] = useState<boolean>(false);
+
+  // Question CRUD Modal State
+  const [questionModalOpen, setQuestionModalOpen] = useState<boolean>(false);
+  const [editingQuestionIndex, setEditingQuestionIndex] = useState<number | null>(null);
+  const [modalQuestionText, setModalQuestionText] = useState<string>("");
+  const [modalOption1, setModalOption1] = useState<string>("");
+  const [modalOption2, setModalOption2] = useState<string>("");
+  const [modalOption3, setModalOption3] = useState<string>("");
+  const [modalOption4, setModalOption4] = useState<string>("");
+  const [modalCorrectAnswer, setModalCorrectAnswer] = useState<string>("");
+  const [modalExplanation, setModalExplanation] = useState<string>("");
 
   // Deadline Extension Modal State
   const [extendingSubmission, setExtendingSubmission] = useState<any | null>(null);
@@ -55,12 +69,59 @@ export const QuizConfiguration: React.FC<QuizConfigurationProps> = ({
   const [isExtending, setIsExtending] = useState<boolean>(false);
   const [extSuccess, setExtSuccess] = useState<boolean>(false);
 
+  // Structured questions configured / uploaded
+  const [uploadedQuestions, setUploadedQuestions] = useState<any[]>([]);
+
+  // Load persistent configuration from MongoDB on mount
+  useEffect(() => {
+    const loadFromDb = async () => {
+      setIsLoadingDb(true);
+      try {
+        const res = await fetch(`/api/office-bearer/activities/manage?type=${encodeURIComponent(activityType)}`);
+        if (res.ok) {
+          const data = await res.json();
+          if (data.proposal) {
+            const p = data.proposal;
+            if (p.title) setTitle(p.title);
+            if (p.timerMinutes) setTimerMinutes(p.timerMinutes);
+            if (p.randomQuestions !== undefined) setRandomQuestions(p.randomQuestions);
+            if (p.randomChoices !== undefined) setRandomChoices(p.randomChoices);
+            if (p.startAt) {
+              const d = new Date(p.startAt);
+              setStartDate(d.toISOString().split("T")[0]);
+              setStartTime(d.toTimeString().substring(0, 5));
+            }
+            if (p.endAt) {
+              const d = new Date(p.endAt);
+              setEndDate(d.toISOString().split("T")[0]);
+              setEndTime(d.toTimeString().substring(0, 5));
+            }
+            if (Array.isArray(p.questions) && p.questions.length > 0) {
+              setUploadedQuestions(p.questions);
+              setCsvQuestionsCount(p.questions.length);
+              setQuestionsToUpload(p.questionsToUpload || p.questions.length);
+              setQuestionsToDisplay(p.questionsToDisplay || p.questions.length);
+              setCsvFileName(p.csvFileName || `${activityType.toLowerCase().replace(" ", "_")}_active.csv`);
+              setIsValidated(true);
+            } else {
+              setQuestionsToUpload(p.questionsToUpload || (activityType === "Placement Questions" ? 4 : 3));
+              setQuestionsToDisplay(p.questionsToDisplay || (activityType === "Placement Questions" ? 4 : 3));
+            }
+          }
+        }
+      } catch (e) {
+        console.error("Failed to load activity from DB:", e);
+      } finally {
+        setIsLoadingDb(false);
+      }
+    };
+
+    loadFromDb();
+  }, [activityType]);
+
   if (!isAssigned) {
     return <UnauthorizedGuard activityName={activityType} />;
   }
-
-  // Structured questions parsed from CSV
-  const [uploadedQuestions, setUploadedQuestions] = useState<any[]>([]);
 
   // CSV Row Parser helper handling quotes and commas
   const parseCSVRow = (text: string): string[] => {
@@ -220,10 +281,96 @@ export const QuizConfiguration: React.FC<QuizConfigurationProps> = ({
     return null;
   };
 
-  const handleSubmitForApproval = (e: React.FormEvent) => {
+  // Question CRUD Handlers
+  const handleOpenAddQuestion = () => {
+    setEditingQuestionIndex(null);
+    setModalQuestionText("");
+    setModalOption1("");
+    setModalOption2("");
+    setModalOption3("");
+    setModalOption4("");
+    setModalCorrectAnswer("");
+    setModalExplanation("");
+    setQuestionModalOpen(true);
+  };
+
+  const handleOpenEditQuestion = (idx: number) => {
+    const q = uploadedQuestions[idx];
+    if (!q) return;
+    setEditingQuestionIndex(idx);
+    setModalQuestionText(q.question || "");
+    const opts = q.options || [];
+    setModalOption1(opts[0] || "");
+    setModalOption2(opts[1] || "");
+    setModalOption3(opts[2] || "");
+    setModalOption4(opts[3] || "");
+    setModalCorrectAnswer(q.correctAnswer || opts[0] || "");
+    setModalExplanation(q.explanation || "");
+    setQuestionModalOpen(true);
+  };
+
+  const handleDeleteQuestion = (idx: number) => {
+    const nextList = uploadedQuestions.filter((_, i) => i !== idx);
+    setUploadedQuestions(nextList);
+    setCsvQuestionsCount(nextList.length);
+    setQuestionsToUpload(nextList.length);
+    if (questionsToDisplay > nextList.length) {
+      setQuestionsToDisplay(nextList.length);
+    }
+    setIsValidated(nextList.length > 0);
+  };
+
+  const handleSaveModalQuestion = (e: React.FormEvent) => {
     e.preventDefault();
-    if (!isValidated || !csvFileName || !csvQuestionsCount) {
-      setValidationError("Please upload and validate a valid CSV file before submitting.");
+    if (!modalQuestionText.trim() || !modalOption1.trim() || !modalOption2.trim()) {
+      alert("Question and at least Choice 1 & Choice 2 are required.");
+      return;
+    }
+    const opts = [
+      modalOption1.trim(),
+      modalOption2.trim(),
+      modalOption3.trim() || "N/A",
+      modalOption4.trim() || "N/A",
+    ];
+    const correct = modalCorrectAnswer.trim() || opts[0];
+    const explanation = modalExplanation.trim() || `Technical rationale for question.`;
+
+    let nextList: any[] = [];
+    if (editingQuestionIndex !== null && editingQuestionIndex >= 0) {
+      nextList = [...uploadedQuestions];
+      nextList[editingQuestionIndex] = {
+        ...nextList[editingQuestionIndex],
+        question: modalQuestionText.trim(),
+        options: opts,
+        correctAnswer: correct,
+        explanation,
+      };
+    } else {
+      const newQ = {
+        id: `q${uploadedQuestions.length + 1}`,
+        question: modalQuestionText.trim(),
+        options: opts,
+        correctAnswer: correct,
+        explanation,
+      };
+      nextList = [...uploadedQuestions, newQ];
+    }
+
+    setUploadedQuestions(nextList);
+    setCsvQuestionsCount(nextList.length);
+    setQuestionsToUpload(nextList.length);
+    if (questionsToDisplay > nextList.length) {
+      setQuestionsToDisplay(nextList.length);
+    }
+    setIsValidated(true);
+    setValidationError(null);
+    setQuestionModalOpen(false);
+  };
+
+  const handleSubmitForApproval = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (uploadedQuestions.length === 0) {
+      setValidationError("Please configure or upload at least 1 question before submitting.");
       return;
     }
 
@@ -236,22 +383,64 @@ export const QuizConfiguration: React.FC<QuizConfigurationProps> = ({
     const startDateTime = new Date(`${startDate}T${startTime}`);
     const endDateTime = new Date(`${endDate}T${endTime}`);
 
-    submitQuizProposal({
-      type: activityType,
-      title: title || `${activityType} Submission`,
-      questions: uploadedQuestions,
-      questionsToUpload,
-      questionsToDisplay,
-      randomQuestions,
-      randomChoices,
-      timerMinutes,
-      questionsDetected: csvQuestionsCount,
-      csvFileName,
-      startAt: startDateTime.toISOString(),
-      endAt: endDateTime.toISOString(),
-    });
+    setIsSaving(true);
+    setValidationError(null);
 
-    setSubmitSuccess(true);
+    try {
+      // 1. Direct MongoDB persistence and activation
+      const res = await fetch("/api/office-bearer/activities/manage", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          type: activityType,
+          title: title || `${activityType} Assessment`,
+          submittedBy: currentOb.name,
+          authorDepartment: currentOb.department,
+          questions: uploadedQuestions,
+          questionsToUpload,
+          questionsToDisplay,
+          randomQuestions,
+          randomChoices,
+          timerMinutes,
+          questionsDetected: uploadedQuestions.length,
+          csvFileName: csvFileName || `${activityType.toLowerCase().replace(" ", "_")}_active.csv`,
+          startAt: startDateTime.toISOString(),
+          endAt: endDateTime.toISOString(),
+          publishImmediately: true,
+        }),
+      });
+
+      if (res.ok) {
+        setSubmitSuccess(true);
+        setSaveMessage(`${activityType} configuration and all ${uploadedQuestions.length} questions persistently saved and activated in MongoDB!`);
+        if (refreshProposals) refreshProposals();
+        setTimeout(() => setSubmitSuccess(false), 5000);
+      } else {
+        const err = await res.json().catch(() => ({}));
+        setValidationError(err.message || "Failed to persist to database.");
+      }
+
+      // 2. Also register in local/shared OB context submissions
+      submitQuizProposal({
+        type: activityType,
+        title: title || `${activityType} Submission`,
+        questions: uploadedQuestions,
+        questionsToUpload,
+        questionsToDisplay,
+        randomQuestions,
+        randomChoices,
+        timerMinutes,
+        questionsDetected: uploadedQuestions.length,
+        csvFileName: csvFileName || `${activityType.toLowerCase().replace(" ", "_")}_active.csv`,
+        startAt: startDateTime.toISOString(),
+        endAt: endDateTime.toISOString(),
+      });
+    } catch (e: any) {
+      console.error("Save error:", e);
+      setValidationError("Network error saving configuration to database.");
+    } finally {
+      setIsSaving(false);
+    }
   };
 
   // Open timeline extension modal
@@ -598,17 +787,139 @@ export const QuizConfiguration: React.FC<QuizConfigurationProps> = ({
               )}
             </div>
 
-            {/* Step 3: Submit Button */}
-            <div className="flex justify-end pt-2">
+            {/* Step 3: Configured Questions List (Full CRUD) */}
+            <div className="p-6 rounded-2xl bg-[#0D1B2A] border border-white/10 shadow-xl space-y-4">
+              <div className="pb-3 border-b border-white/10 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2">
+                <div>
+                  <h3 className="text-lg font-bold text-[#F8FAFC] flex items-center gap-2">
+                    <Layers className="w-5 h-5 text-[#22D3EE]" />
+                    <span>3. Configured Question Pool ({uploadedQuestions.length} Questions)</span>
+                  </h3>
+                  <p className="text-xs text-[#94A3B8] mt-0.5">
+                    View, edit, or add questions. Students will receive {questionsToDisplay} questions from this pool.
+                  </p>
+                </div>
+                <Button
+                  type="button"
+                  variant="outline"
+                  size="sm"
+                  onClick={handleOpenAddQuestion}
+                  leftIcon={<Plus className="w-4 h-4 text-[#22D3EE]" />}
+                  className="self-start sm:self-auto border-[#0078D4]/40 hover:border-[#0078D4]"
+                >
+                  Add Question
+                </Button>
+              </div>
+
+              {isLoadingDb ? (
+                <div className="py-8 text-center text-xs text-[#94A3B8] flex items-center justify-center space-x-2">
+                  <Loader2 className="w-4 h-4 animate-spin text-[#0078D4]" />
+                  <span>Loading questions from database...</span>
+                </div>
+              ) : uploadedQuestions.length === 0 ? (
+                <div className="py-8 text-center text-xs text-[#94A3B8] border border-dashed border-white/10 rounded-xl p-4">
+                  No questions configured yet. Upload a CSV file above or click <strong>Add Question</strong> to create questions manually.
+                </div>
+              ) : (
+                <div className="space-y-3 max-h-[480px] overflow-y-auto pr-1">
+                  {uploadedQuestions.map((q, idx) => (
+                    <div
+                      key={q.id || idx}
+                      className="p-4 rounded-xl bg-[#07111F] border border-white/10 space-y-2.5 text-xs hover:border-white/20 transition-all"
+                    >
+                      <div className="flex items-start justify-between gap-2">
+                        <div className="flex items-start gap-2">
+                          <span className="px-2 py-0.5 rounded bg-[#0078D4]/20 text-[#22D3EE] font-mono font-bold text-[11px] flex-shrink-0">
+                            #{idx + 1}
+                          </span>
+                          <span className="font-semibold text-[#F8FAFC] leading-snug">
+                            {q.question}
+                          </span>
+                        </div>
+                        <div className="flex items-center space-x-1 flex-shrink-0">
+                          <button
+                            type="button"
+                            onClick={() => handleOpenEditQuestion(idx)}
+                            className="p-1.5 rounded-lg text-[#CBD5E1] hover:text-[#22D3EE] hover:bg-white/5 transition-colors"
+                            title="Edit Question"
+                          >
+                            <Edit3 className="w-3.5 h-3.5" />
+                          </button>
+                          <button
+                            type="button"
+                            onClick={() => handleDeleteQuestion(idx)}
+                            className="p-1.5 rounded-lg text-[#CBD5E1] hover:text-red-400 hover:bg-white/5 transition-colors"
+                            title="Delete Question"
+                          >
+                            <Trash2 className="w-3.5 h-3.5" />
+                          </button>
+                        </div>
+                      </div>
+
+                      {/* Options */}
+                      <div className="grid grid-cols-1 sm:grid-cols-2 gap-1.5 pt-1 pl-7">
+                        {(q.options || []).map((opt: string, oIdx: number) => {
+                          const isCorrect = opt === q.correctAnswer;
+                          return (
+                            <div
+                              key={oIdx}
+                              className={`p-2 rounded-lg border text-[11px] flex items-center justify-between ${
+                                isCorrect
+                                  ? "bg-emerald-500/10 border-emerald-500/30 text-emerald-300 font-semibold"
+                                  : "bg-white/[0.02] border-white/5 text-[#94A3B8]"
+                              }`}
+                            >
+                              <span>
+                                <strong className="text-white/60 mr-1.5 font-mono">
+                                  {String.fromCharCode(65 + oIdx)}.
+                                </strong>
+                                {opt}
+                              </span>
+                              {isCorrect && (
+                                <span className="text-[10px] font-mono text-emerald-400 font-bold ml-1">
+                                  ✓ Correct
+                                </span>
+                              )}
+                            </div>
+                          );
+                        })}
+                      </div>
+
+                      {q.explanation && (
+                        <div className="text-[11px] text-[#94A3B8] pl-7 pt-1 border-t border-white/5">
+                          <strong className="text-[#22D3EE] mr-1 font-mono">Rationale:</strong>
+                          {q.explanation}
+                        </div>
+                      )}
+                    </div>
+                  ))}
+                </div>
+              )}
+            </div>
+
+            {/* Save Message Feedback */}
+            {saveMessage && (
+              <div className="p-4 rounded-xl bg-emerald-500/15 border border-emerald-500/40 text-emerald-300 text-xs flex items-center space-x-2 animate-fade-in">
+                <CheckCircle2 className="w-4 h-4 flex-shrink-0 text-emerald-400" />
+                <span>{saveMessage}</span>
+              </div>
+            )}
+
+            {/* Step 4: Persistent Save & Publish Button */}
+            <div className="flex flex-col sm:flex-row items-center justify-between gap-3 pt-2">
+              <div className="text-xs text-[#94A3B8] flex items-center space-x-1.5">
+                <Database className="w-3.5 h-3.5 text-[#22D3EE]" />
+                <span>Directly persists to MongoDB mcc_database proposals</span>
+              </div>
               <Button
                 type="submit"
                 variant="primary"
                 size="lg"
-                disabled={!isValidated}
-                leftIcon={<Send className="w-4 h-4" />}
-                className={!isValidated ? "opacity-50 cursor-not-allowed" : ""}
+                disabled={isSaving || uploadedQuestions.length === 0}
+                leftIcon={isSaving ? <Loader2 className="w-4 h-4 animate-spin" /> : <Save className="w-4 h-4" />}
+                className="w-full sm:w-auto"
               >
-                Submit for Approval
+                {isSaving ? "Saving to MongoDB..." : "Save & Activate in Database"}
               </Button>
             </div>
           </form>
@@ -872,6 +1183,142 @@ export const QuizConfiguration: React.FC<QuizConfigurationProps> = ({
                 </div>
               </>
             )}
+          </div>
+        </div>
+      )}
+
+      {/* Question Add / Edit Modal */}
+      {questionModalOpen && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/80 backdrop-blur-md animate-fade-in">
+          <div className="w-full max-w-lg rounded-2xl bg-[#0D1B2A] border border-white/15 p-6 shadow-2xl space-y-5 relative max-h-[90vh] overflow-y-auto">
+            <div className="flex items-center justify-between pb-3 border-b border-white/10">
+              <div className="flex items-center space-x-2">
+                <Edit3 className="w-5 h-5 text-[#22D3EE]" />
+                <h3 className="text-base font-bold text-[#F8FAFC]">
+                  {editingQuestionIndex !== null ? `Edit Question #${editingQuestionIndex + 1}` : "Add New Question"}
+                </h3>
+              </div>
+              <button
+                type="button"
+                onClick={() => setQuestionModalOpen(false)}
+                className="p-1 rounded-lg text-[#94A3B8] hover:text-white hover:bg-white/10"
+              >
+                <X className="w-5 h-5" />
+              </button>
+            </div>
+
+            <form onSubmit={handleSaveModalQuestion} className="space-y-4 text-xs">
+              <div>
+                <label className="block text-[#CBD5E1] font-semibold mb-1">
+                  Question Text <span className="text-red-400">*</span>
+                </label>
+                <textarea
+                  required
+                  rows={3}
+                  value={modalQuestionText}
+                  onChange={(e) => setModalQuestionText(e.target.value)}
+                  placeholder="Enter the complete question prompt..."
+                  className="w-full p-2.5 rounded-xl bg-[#07111F] border border-white/15 text-[#F8FAFC] text-xs focus:outline-none focus:border-[#0078D4]"
+                />
+              </div>
+
+              <div className="space-y-2">
+                <label className="block text-[#CBD5E1] font-semibold">
+                  Multiple Choice Options <span className="text-red-400">*</span>
+                </label>
+                <div className="space-y-2">
+                  <div className="flex items-center space-x-2">
+                    <span className="font-mono font-bold text-[#22D3EE] w-6 text-center">A.</span>
+                    <input
+                      type="text"
+                      required
+                      value={modalOption1}
+                      onChange={(e) => setModalOption1(e.target.value)}
+                      placeholder="Choice 1..."
+                      className="flex-1 h-9 px-2.5 rounded-lg bg-[#07111F] border border-white/15 text-[#F8FAFC] text-xs focus:outline-none focus:border-[#0078D4]"
+                    />
+                  </div>
+                  <div className="flex items-center space-x-2">
+                    <span className="font-mono font-bold text-[#22D3EE] w-6 text-center">B.</span>
+                    <input
+                      type="text"
+                      required
+                      value={modalOption2}
+                      onChange={(e) => setModalOption2(e.target.value)}
+                      placeholder="Choice 2..."
+                      className="flex-1 h-9 px-2.5 rounded-lg bg-[#07111F] border border-white/15 text-[#F8FAFC] text-xs focus:outline-none focus:border-[#0078D4]"
+                    />
+                  </div>
+                  <div className="flex items-center space-x-2">
+                    <span className="font-mono font-bold text-[#22D3EE] w-6 text-center">C.</span>
+                    <input
+                      type="text"
+                      value={modalOption3}
+                      onChange={(e) => setModalOption3(e.target.value)}
+                      placeholder="Choice 3 (optional)..."
+                      className="flex-1 h-9 px-2.5 rounded-lg bg-[#07111F] border border-white/15 text-[#F8FAFC] text-xs focus:outline-none focus:border-[#0078D4]"
+                    />
+                  </div>
+                  <div className="flex items-center space-x-2">
+                    <span className="font-mono font-bold text-[#22D3EE] w-6 text-center">D.</span>
+                    <input
+                      type="text"
+                      value={modalOption4}
+                      onChange={(e) => setModalOption4(e.target.value)}
+                      placeholder="Choice 4 (optional)..."
+                      className="flex-1 h-9 px-2.5 rounded-lg bg-[#07111F] border border-white/15 text-[#F8FAFC] text-xs focus:outline-none focus:border-[#0078D4]"
+                    />
+                  </div>
+                </div>
+              </div>
+
+              <div>
+                <label className="block text-[#CBD5E1] font-semibold mb-1">
+                  Correct Answer <span className="text-red-400">*</span>
+                </label>
+                <select
+                  value={modalCorrectAnswer || modalOption1}
+                  onChange={(e) => setModalCorrectAnswer(e.target.value)}
+                  className="w-full h-9 px-2.5 rounded-lg bg-[#07111F] border border-white/15 text-emerald-400 text-xs focus:outline-none focus:border-[#0078D4]"
+                >
+                  <option value={modalOption1}>{modalOption1 ? `A: ${modalOption1}` : "Choice A"}</option>
+                  <option value={modalOption2}>{modalOption2 ? `B: ${modalOption2}` : "Choice B"}</option>
+                  {modalOption3 && <option value={modalOption3}>C: {modalOption3}</option>}
+                  {modalOption4 && <option value={modalOption4}>D: {modalOption4}</option>}
+                </select>
+              </div>
+
+              <div>
+                <label className="block text-[#CBD5E1] font-semibold mb-1">
+                  Technical Explanation / Rationale
+                </label>
+                <textarea
+                  rows={2}
+                  value={modalExplanation}
+                  onChange={(e) => setModalExplanation(e.target.value)}
+                  placeholder="Detailed explanation shown to students after test completion..."
+                  className="w-full p-2.5 rounded-xl bg-[#07111F] border border-white/15 text-[#F8FAFC] text-xs focus:outline-none focus:border-[#0078D4]"
+                />
+              </div>
+
+              <div className="pt-3 border-t border-white/10 flex items-center justify-end space-x-3">
+                <Button
+                  type="button"
+                  variant="ghost"
+                  size="sm"
+                  onClick={() => setQuestionModalOpen(false)}
+                >
+                  Cancel
+                </Button>
+                <Button
+                  type="submit"
+                  variant="primary"
+                  size="sm"
+                >
+                  {editingQuestionIndex !== null ? "Update Question" : "Save Question"}
+                </Button>
+              </div>
+            </form>
           </div>
         </div>
       )}

@@ -18,7 +18,17 @@ export async function GET() {
       ...(setting?.value || {}),
     };
 
-    const timelines: Record<string, { startAt?: string | null; endAt?: string | null; title?: string }> = {};
+    const timelines: Record<
+      string,
+      {
+        startAt?: string | null;
+        endAt?: string | null;
+        title?: string;
+        timerMinutes?: number;
+        questionsToDisplay?: number;
+        totalQuestions?: number;
+      }
+    > = {};
 
     // 2. Fetch active approved proposals for General Quiz & Placement Questions from MongoDB
     const now = new Date();
@@ -45,6 +55,9 @@ export async function GET() {
         startAt: quizStart.toISOString(),
         endAt: quizEnd.toISOString(),
         title: activeQuiz.title,
+        timerMinutes: activeQuiz.timerMinutes || 15,
+        questionsToDisplay: activeQuiz.questionsToDisplay || (activeQuiz.questions?.length || 3),
+        totalQuestions: activeQuiz.questions?.length || activeQuiz.questionsToUpload || 3,
       };
 
       if (now < quizStart) {
@@ -67,10 +80,22 @@ export async function GET() {
             startAt: latestQuiz.startAt ? new Date(latestQuiz.startAt).toISOString() : null,
             endAt: quizEnd.toISOString(),
             title: latestQuiz.title,
+            timerMinutes: latestQuiz.timerMinutes || 15,
+            questionsToDisplay: latestQuiz.questionsToDisplay || (latestQuiz.questions?.length || 3),
+            totalQuestions: latestQuiz.questions?.length || latestQuiz.questionsToUpload || 3,
           };
           availabilityMap["General Quiz"] = "CLOSED";
         }
       }
+    } else if (activeQuiz) {
+      timelines["General Quiz"] = {
+        startAt: activeQuiz.startAt ? new Date(activeQuiz.startAt).toISOString() : null,
+        endAt: activeQuiz.endAt ? new Date(activeQuiz.endAt).toISOString() : null,
+        title: activeQuiz.title,
+        timerMinutes: activeQuiz.timerMinutes || 15,
+        questionsToDisplay: activeQuiz.questionsToDisplay || (activeQuiz.questions?.length || 3),
+        totalQuestions: activeQuiz.questions?.length || activeQuiz.questionsToUpload || 3,
+      };
     }
 
     // Calculate Placement Questions dynamic availability from timeline
@@ -82,6 +107,9 @@ export async function GET() {
         startAt: placementStart.toISOString(),
         endAt: placementEnd.toISOString(),
         title: activePlacement.title,
+        timerMinutes: activePlacement.timerMinutes || 30,
+        questionsToDisplay: activePlacement.questionsToDisplay || (activePlacement.questions?.length || 4),
+        totalQuestions: activePlacement.questions?.length || activePlacement.questionsToUpload || 4,
       };
 
       if (now < placementStart) {
@@ -104,10 +132,22 @@ export async function GET() {
             startAt: latestPlacement.startAt ? new Date(latestPlacement.startAt).toISOString() : null,
             endAt: placementEnd.toISOString(),
             title: latestPlacement.title,
+            timerMinutes: latestPlacement.timerMinutes || 30,
+            questionsToDisplay: latestPlacement.questionsToDisplay || (latestPlacement.questions?.length || 4),
+            totalQuestions: latestPlacement.questions?.length || latestPlacement.questionsToUpload || 4,
           };
           availabilityMap["Placement Questions"] = "CLOSED";
         }
       }
+    } else if (activePlacement) {
+      timelines["Placement Questions"] = {
+        startAt: activePlacement.startAt ? new Date(activePlacement.startAt).toISOString() : null,
+        endAt: activePlacement.endAt ? new Date(activePlacement.endAt).toISOString() : null,
+        title: activePlacement.title,
+        timerMinutes: activePlacement.timerMinutes || 30,
+        questionsToDisplay: activePlacement.questionsToDisplay || (activePlacement.questions?.length || 4),
+        totalQuestions: activePlacement.questions?.length || activePlacement.questionsToUpload || 4,
+      };
     }
 
     return NextResponse.json({
