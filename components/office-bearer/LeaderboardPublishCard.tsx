@@ -83,7 +83,8 @@ export const LeaderboardPublishCard: React.FC<LeaderboardPublishCardProps> = ({
     setDownloadingExcel(true);
     setErrorMsg(null);
     try {
-      const res = await fetch("/api/leaderboard/export");
+      const exportType = activityType || "Placement Questions";
+      const res = await fetch(`/api/leaderboard/export?type=${encodeURIComponent(exportType)}`);
       if (!res.ok) {
         const errData = await res.json().catch(() => ({}));
         throw new Error(errData.message || "Failed to download Excel report.");
@@ -93,7 +94,8 @@ export const LeaderboardPublishCard: React.FC<LeaderboardPublishCardProps> = ({
       const url = window.URL.createObjectURL(blob);
       const a = document.createElement("a");
       a.href = url;
-      a.download = `MCC_Placement_Leaderboard_Week_${weekNumber}.xlsx`;
+      const safeTitle = (activityType || "Placement").replace(/\s+/g, "_");
+      a.download = `MCC_${safeTitle}_Leaderboard_Week_${weekNumber}.xlsx`;
       document.body.appendChild(a);
       a.click();
       window.URL.revokeObjectURL(url);
@@ -105,9 +107,12 @@ export const LeaderboardPublishCard: React.FC<LeaderboardPublishCardProps> = ({
     }
   };
 
+  const isQuiz = (activityType || "").toLowerCase().includes("quiz");
   const isObAuthorized =
     role === "ADMIN" ||
-    assignedResponsibility === "Placement Questions";
+    (isQuiz
+      ? (assignedResponsibility || "").toLowerCase().includes("quiz") || (assignedResponsibility || "").toLowerCase().includes("general")
+      : (assignedResponsibility || "").toLowerCase().includes("placement"));
 
   const handleResetLeaderboard = async () => {
     if (!window.confirm("Are you sure you want to reset the leaderboard for a new placement round? This will advance the round/week number and unpublish current rankings until the new round completes.")) {

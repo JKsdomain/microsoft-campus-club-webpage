@@ -7,9 +7,15 @@ import * as XLSX from "xlsx";
 // GET /api/leaderboard/export
 // Downloads official Placement Questions Leaderboard as genuine .xlsx file.
 // Server-side authorized ONLY for Admin and responsible Placement Questions Office Bearer.
-export async function GET() {
+export async function GET(req: Request) {
   try {
     await dbConnect();
+
+    const { searchParams } = new URL(req.url);
+    const requestedType = searchParams.get("type") || "Placement Questions";
+    const isQuiz = requestedType.toLowerCase().includes("quiz");
+    const targetActivityType = isQuiz ? "GENERAL_QUIZ" : "PLACEMENT_QUESTIONS";
+    const activityHumanTitle = isQuiz ? "General Quiz" : "Placement Questions";
 
     // 1. Authenticate Requester Session
     const cookieStore = await cookies();
@@ -39,18 +45,22 @@ export async function GET() {
 
     if (!role) {
       return NextResponse.json(
-        { message: "Unauthorized. You must be logged in as an Administrator or Placement Office Bearer to export the leaderboard." },
+        { message: `Unauthorized. You must be logged in as an Administrator or ${activityHumanTitle} Office Bearer to export leaderboard reports.` },
         { status: 401 }
       );
     }
 
-    // 2. Server-Side Authorization Check: ONLY Admin or Placement Questions OB
+    // 2. Server-Side Authorization Check: ONLY Admin or Assigned OB
     if (role === "OFFICE_BEARER") {
       const normalizedResp = obResponsibility.toLowerCase().replace(/_/g, " ").trim();
-      if (!normalizedResp.includes("placement")) {
+      const isAuthorized = isQuiz
+        ? (normalizedResp.includes("quiz") || normalizedResp.includes("general"))
+        : normalizedResp.includes("placement");
+
+      if (!isAuthorized) {
         return NextResponse.json(
           {
-            message: `Unauthorized: Office Bearer assigned to "${obResponsibility}" cannot export the Placement Questions leaderboard.`,
+            message: `Unauthorized: Office Bearer assigned to "${obResponsibility}" cannot export the ${activityHumanTitle} leaderboard.`,
           },
           { status: 403 }
         );
@@ -59,18 +69,22 @@ export async function GET() {
 
     // 3. Query Week Document
     const weekDoc = await LeaderboardWeek.findOne({
-      activityType: { $in: ["PLACEMENT_QUESTIONS", "Placement Questions", "ALL"] }
+      activityType: { $in: [targetActivityType, activityHumanTitle, "ALL"] }
     }).sort({ createdAt: -1 });
 
     const weekNumber = weekDoc?.weekNumber || 1;
 
-    // 4. Retrieve Persisted MongoDB Placement Question Test Attempts
+    // 4. Retrieve Persisted MongoDB Test Attempts
+    const dbTypes = isQuiz
+      ? ["General Quiz", "GENERAL_QUIZ", "QUIZ"]
+      : ["Placement Questions", "PLACEMENT_QUESTIONS", "PLACEMENT"];
+
     const attempts = await TestAttempt.find({
       status: { $in: ["COMPLETED", "SUBMITTED"] },
-      activityType: { $in: ["Placement Questions", "PLACEMENT_QUESTIONS", "PLACEMENT"] },
+      activityType: { $in: dbTypes },
     })
       .sort({ score: -1, percentage: -1, submittedAt: 1 })
-      .limit(500);
+      .limit(1000);
 
     // Deduplicate to take best attempt per student
     const studentBestMap = new Map<string, any>();
@@ -104,8 +118,8 @@ export async function GET() {
       "Section": att.section || "A",
       "Score": att.score,
       "Total Questions": att.totalQuestions || 0,
-      "Correct Answers": att.correctAnswersCount || 0,
-      "Wrong Answers": att.wrongAnswersCount || 0,
+      "Correct Answers": att.correctAnswers ?? att.correctCount ?? 0,
+      "Wrong Answers": att.wrongAnswers ?? att.wrongCount ?? 0,
       "Percentage": `${att.percentage}%`,
       "Submission Date/Time": att.submittedAt
         ? new Date(att.submittedAt).toISOString().replace("T", " ").substring(0, 19)
@@ -118,7 +132,7 @@ export async function GET() {
       : [
           {
             "Rank": "",
-            "Student Name": "No placement results available yet.",
+            "Student Name": `No ${activityHumanTitle.toLowerCase()} results available yet.`,
             "Email": "",
             "Roll Number": "",
             "Department": "",
@@ -154,13 +168,13 @@ export async function GET() {
     ];
 
     const workbook = XLSX.utils.book_new();
-    XLSX.utils.book_append_sheet(workbook, worksheet, `Placement Week ${weekNumber}`);
+    const sheetName = `${activityHumanTitle} Week ${weekNumber}`;
+    XLSX.utils.book_append_sheet(workbook, worksheet, sheetName);
 
     const buffer = XLSX.write(workbook, { type: "buffer", bookType: "xlsx" });
+    const filename = `MCC_${activityHumanTitle.replace(/\s+/g, "_")}_Leaderboard_Week_${weekNumber}.xlsx`;
 
-    const filename = `MCC_Placement_Leaderboard_Week_${weekNumber}.xlsx`;
-
-    console.log(`✅ [EXCEL EXPORT] Placement leaderboard exported by ${actorName || "Admin"} (${excelRows.length} entries)`);
+    console.log(`✅ [EXCEL EXPORT] ${activityHumanTitle} leaderboard exported by ${actorName || "Admin"} (${excelRows.length} entries)`);
 
     return new NextResponse(buffer, {
       status: 200,
@@ -172,7 +186,7 @@ export async function GET() {
   } catch (error: any) {
     console.error("❌ [API GET /leaderboard/export] Error:", error);
     return NextResponse.json(
-      { message: "Failed to export placement leaderboard.", error: error.message },
+      { message: "Failed to export leaderboard report.", error: error.message },
       { status: 500 }
     );
   }
