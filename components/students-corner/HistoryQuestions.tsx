@@ -135,82 +135,96 @@ export const HistoryQuestions: React.FC = () => {
 
         {/* Questions & Explanations List (Read-Only Learning View) */}
         <div className="space-y-8">
-          {selectedSet.questions.map((q, idx) => (
-            <div
-              key={q.id}
-              className="p-6 sm:p-8 rounded-2xl bg-[#0D1B2A] border border-white/10 shadow-xl space-y-6"
-            >
-              {/* Question Header */}
-              <div className="flex items-center justify-between border-b border-white/10 pb-3">
-                <span className="text-xs font-bold font-mono text-[#22D3EE] uppercase tracking-wider">
-                  Question {String(idx + 1).padStart(2, "0")}
-                </span>
-                <span className="text-[11px] font-mono text-[#94A3B8]">
-                  Placement Archive
-                </span>
-              </div>
-
-              {/* Question Text */}
-              <p className="text-base text-[#F8FAFC] font-semibold leading-relaxed">
-                {q.question}
-              </p>
-
-              {/* Choices List */}
-              <div className="space-y-2.5">
-                <span className="text-[11px] font-mono uppercase text-[#94A3B8] font-semibold block mb-1">
-                  Options:
-                </span>
-                {q.options.map((opt, oIdx) => {
-                  const optionLabel = String.fromCharCode(65 + oIdx);
-                  const isCorrect = opt === q.correctAnswer;
-
-                  return (
-                    <div
-                      key={oIdx}
-                      className={`p-3.5 rounded-xl border flex items-start space-x-3 text-xs transition-all ${
-                        isCorrect
-                          ? "bg-emerald-500/10 border-emerald-500/40 text-[#F8FAFC]"
-                          : "bg-[#07111F] border-white/10 text-[#CBD5E1]"
-                      }`}
-                    >
-                      <span
-                        className={`w-6 h-6 rounded-lg flex items-center justify-center font-bold text-xs flex-shrink-0 ${
-                          isCorrect
-                            ? "bg-emerald-500 text-white"
-                            : "bg-[#122438] text-[#94A3B8]"
-                        }`}
-                      >
-                        {optionLabel}
-                      </span>
-                      <span className="pt-0.5 leading-relaxed flex-1">{opt}</span>
-                      {isCorrect && (
-                        <span className="text-[10px] font-bold uppercase tracking-wider text-emerald-400 bg-emerald-500/20 px-2 py-0.5 rounded border border-emerald-500/30 flex-shrink-0">
-                          Correct Answer
-                        </span>
-                      )}
-                    </div>
-                  );
-                })}
-              </div>
-
-              {/* Correct Answer & Detailed Explanation */}
-              <div className="p-4 rounded-xl bg-[#07111F] border border-emerald-500/20 space-y-2 text-xs">
-                <div className="flex items-center space-x-2 text-emerald-400 font-bold">
-                  <CheckCircle2 className="w-4 h-4" />
-                  <span>Correct Answer: {q.correctAnswer}</span>
-                </div>
-
-                <div className="pt-2 border-t border-white/5">
-                  <span className="text-[#22D3EE] font-semibold block mb-1">
-                    Explanation:
-                  </span>
-                  <p className="text-[#CBD5E1] leading-relaxed font-normal">
-                    {q.explanation}
-                  </p>
-                </div>
-              </div>
+          {!selectedSet.questions || selectedSet.questions.length === 0 ? (
+            <div className="p-8 text-center rounded-2xl bg-[#0D1B2A] border border-white/10 text-sm text-[#94A3B8]">
+              No question details found for this archived set.
             </div>
-          ))}
+          ) : (
+            selectedSet.questions.map((q, idx) => {
+              const safeOptions = Array.isArray(q.options) ? q.options : [];
+              const safeQuestionText = q.question || (q as any).questionText || `Question ${idx + 1}`;
+              const safeExplanation = q.explanation || (q as any).exp || "Explanation provided for review and learning reference.";
+              const safeCorrectAnswer = q.correctAnswer || (q as any).answer || safeOptions[0] || "";
+
+              return (
+                <div
+                  key={q.id || idx}
+                  className="p-6 sm:p-8 rounded-2xl bg-[#0D1B2A] border border-white/10 shadow-xl space-y-6"
+                >
+                  {/* Question Header */}
+                  <div className="flex items-center justify-between border-b border-white/10 pb-3">
+                    <span className="text-xs font-bold font-mono text-[#22D3EE] uppercase tracking-wider">
+                      Question {String(idx + 1).padStart(2, "0")}
+                    </span>
+                    <span className="text-[11px] font-mono text-[#94A3B8]">
+                      Revision Archive
+                    </span>
+                  </div>
+
+                  {/* Question Text */}
+                  <p className="text-base text-[#F8FAFC] font-semibold leading-relaxed">
+                    {safeQuestionText}
+                  </p>
+
+                  {/* Choices List */}
+                  <div className="space-y-2.5">
+                    <span className="text-[11px] font-mono uppercase text-[#94A3B8] font-semibold block mb-1">
+                      Options:
+                    </span>
+                    {safeOptions.map((opt, oIdx) => {
+                      const optionText = typeof opt === "string" ? opt : (opt as any)?.text || String(opt);
+                      const optionLabel = String.fromCharCode(65 + oIdx);
+                      const isCorrect = optionText === safeCorrectAnswer;
+
+                      return (
+                        <div
+                          key={oIdx}
+                          className={`p-3.5 rounded-xl border flex items-start space-x-3 text-xs transition-all ${
+                            isCorrect
+                              ? "bg-emerald-500/10 border-emerald-500/40 text-[#F8FAFC]"
+                              : "bg-[#07111F] border-white/10 text-[#CBD5E1]"
+                          }`}
+                        >
+                          <span
+                            className={`w-6 h-6 rounded-lg flex items-center justify-center font-bold text-xs flex-shrink-0 ${
+                              isCorrect
+                                ? "bg-emerald-500 text-white"
+                                : "bg-[#122438] text-[#94A3B8]"
+                            }`}
+                          >
+                            {optionLabel}
+                          </span>
+                          <span className="pt-0.5 leading-relaxed flex-1">{optionText}</span>
+                          {isCorrect && (
+                            <span className="text-[10px] font-bold uppercase tracking-wider text-emerald-400 bg-emerald-500/20 px-2 py-0.5 rounded border border-emerald-500/30 flex-shrink-0">
+                              Correct Answer
+                            </span>
+                          )}
+                        </div>
+                      );
+                    })}
+                  </div>
+
+                  {/* Correct Answer & Detailed Explanation */}
+                  <div className="p-4 rounded-xl bg-[#07111F] border border-emerald-500/20 space-y-2 text-xs">
+                    <div className="flex items-center space-x-2 text-emerald-400 font-bold">
+                      <CheckCircle2 className="w-4 h-4" />
+                      <span>Correct Answer: {safeCorrectAnswer}</span>
+                    </div>
+
+                    <div className="pt-2 border-t border-white/5">
+                      <span className="text-[#22D3EE] font-semibold block mb-1">
+                        Explanation:
+                      </span>
+                      <p className="text-[#CBD5E1] leading-relaxed font-normal">
+                        {safeExplanation}
+                      </p>
+                    </div>
+                  </div>
+                </div>
+              );
+            })
+          )}
         </div>
       </div>
     );

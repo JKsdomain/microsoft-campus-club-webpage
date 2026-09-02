@@ -3,27 +3,82 @@ import { dbConnect } from "@/lib/db/dbConnect";
 import { ProposalModel } from "@/lib/db/models";
 import { ACTIVE_PLACEMENT_SET, HistorySet, TestQuestion } from "@/lib/studentState";
 
+// Helper: Normalize raw question objects into standard TestQuestion schema
+function normalizeQuestions(rawList: any[]): TestQuestion[] {
+  if (!Array.isArray(rawList)) return [];
+
+  return rawList.map((item: any, idx: number) => {
+    let questionText = item.question || item.questionText || item.text || `Question ${idx + 1}`;
+    
+    let optionsList: string[] = [];
+    if (Array.isArray(item.options) && item.options.length > 0) {
+      optionsList = item.options.map((opt: any) => (typeof opt === "string" ? opt : opt.text || String(opt)));
+    } else if (Array.isArray(item.choices) && item.choices.length > 0) {
+      optionsList = item.choices.map((c: any) => (typeof c === "string" ? c : c.text || String(c)));
+    } else {
+      optionsList = ["Option A", "Option B", "Option C", "Option D"];
+    }
+
+    let correctAnswer = item.correctAnswer || item.answer || item.correct;
+    if (!correctAnswer || !optionsList.includes(correctAnswer)) {
+      correctAnswer = optionsList[0] || "Option A";
+    }
+
+    let explanation = item.explanation || item.exp || "Explanation provided for review and learning reference.";
+
+    return {
+      id: String(item.id || item._id || idx + 1),
+      question: questionText,
+      options: optionsList,
+      correctAnswer,
+      explanation,
+    };
+  });
+}
+
 // GET /api/students-corner/history-questions
-// Queries approved/archived Placement Questions from MongoDB Atlas.
-// Computes 1-month expiry lifecycle (publishedAt + 30 days = expiresAt) dynamically.
+// Queries approved/archived Placement Questions & General Quizzes from MongoDB Atlas.
+// Automatically purges expired history questions older than 30 days (1 month).
 export async function GET() {
   try {
     await dbConnect();
 
+    const now = new Date();
+    const thirtyDaysAgo = new Date(now.getTime() - 30 * 24 * 60 * 60 * 1000);
+
+    // 1. Automatic 30-Day Auto Purge: Delete archived proposals older than 30 days
+    try {
+      const purgeResult = await ProposalModel.deleteMany({
+        type: { $in: ["PLACEMENT_QUESTIONS", "GENERAL_QUIZ"] },
+        status: "ARCHIVED",
+        updatedAt: { $lt: thirtyDaysAgo },
+      });
+      if (purgeResult.deletedCount > 0) {
+        console.log(`🧹 [AUTO-PURGE 30-DAY LIFECYCLE] Purged ${purgeResult.deletedCount} history question set(s) older than 30 days.`);
+      }
+    } catch (purgeErr) {
+      console.warn("Could not execute 30-day auto purge on proposals:", purgeErr);
+    }
+
+    // 2. Query remaining active/archived proposals
     const proposals = await ProposalModel.find({
-      type: "PLACEMENT_QUESTIONS",
+      type: { $in: ["PLACEMENT_QUESTIONS", "GENERAL_QUIZ"] },
       status: { $in: ["APPROVED", "ARCHIVED"] },
     }).sort({ createdAt: -1 });
 
-    const now = new Date();
     let bannerNotice: string | null = null;
     let activeExpiresAt: string | null = null;
 
     // Filter proposals:
-    // 1. Must be ARCHIVED or have concluded its scheduled test timeline (endAt <= now)
-    // 2. Must contain real uploaded questions
+    // 1. Must be ARCHIVED or completed past endAt
+    // 2. Published within 30 days (publishedDateObj >= thirtyDaysAgo)
+    // 3. Contain valid question entries
     const eligibleProposals = proposals.filter((p: any) => {
-      // Must be archived or test timeline completed
+      const publishedDateObj = p.archivedAt || p.reviewedAt || p.submittedAt || p.createdAt || now;
+      if (new Date(publishedDateObj).getTime() < thirtyDaysAgo.getTime()) {
+        return false;
+      }
+
       const isArchived = p.status === "ARCHIVED";
       const isPastTimeline = p.endAt ? new Date(p.endAt).getTime() <= now.getTime() : isArchived;
       if (!isArchived && !isPastTimeline) {
@@ -45,42 +100,46 @@ export async function GET() {
     });
 
     const historySets: HistorySet[] = eligibleProposals.map((p: any, idx: number) => {
-      const publishedDateObj = p.reviewedAt || p.submittedAt || p.createdAt || now;
+      const publishedDateObj = p.archivedAt || p.reviewedAt || p.submittedAt || p.createdAt || now;
       const publishedDateStr = new Date(publishedDateObj).toISOString().split("T")[0];
 
       // Expiry lifecycle: 1 month (30 days) from publication
-      const expiryDateObj = p.expiresAt || new Date(new Date(publishedDateObj).getTime() + 30 * 24 * 60 * 60 * 1000);
-      const expiryDateStr = new Date(expiryDateObj).toISOString().split("T")[0];
+      const expiryDateObj = new Date(new Date(publishedDateObj).getTime() + 30 * 24 * 60 * 60 * 1000);
+      const expiryDateStr = expiryDateObj.toISOString().split("T")[0];
 
-      const isExpired = now.getTime() > new Date(expiryDateObj).getTime();
+      const isExpired = now.getTime() > expiryDateObj.getTime();
 
       if (!isExpired && !activeExpiresAt) {
         activeExpiresAt = expiryDateStr;
-        bannerNotice = `📌 Notice: Placement history questions remain active for 1 month from publication. Current question set active until: ${expiryDateStr}.`;
+        bannerNotice = `📌 Notice: History questions remain available for 1 month from publication. Current active set valid until: ${expiryDateStr}.`;
       }
 
-      // Extract real questions
-      let parsedQuestions: TestQuestion[] = [];
+      // Extract & normalize real database questions
+      let rawQuestions: any[] = [];
       if (Array.isArray(p.questions) && p.questions.length > 0) {
-        parsedQuestions = p.questions;
+        rawQuestions = p.questions;
       } else if (p.details) {
         try {
           const parsed = JSON.parse(p.details);
           if (Array.isArray(parsed)) {
-            parsedQuestions = parsed;
+            rawQuestions = parsed;
           } else if (Array.isArray(parsed.questions)) {
-            parsedQuestions = parsed.questions;
+            rawQuestions = parsed.questions;
           }
         } catch {}
       }
 
+      const parsedQuestions = normalizeQuestions(rawQuestions);
+
+      const typeLabel = p.type === "GENERAL_QUIZ" ? "General Quiz" : "Placement Questions";
+
       return {
         id: String(p._id),
-        weekName: p.title || `Placement Questions — Set #${eligibleProposals.length - idx}`,
-        title: p.title || "Placement Preparation & Technical Assessment",
+        weekName: p.title || `${typeLabel} — Set #${eligibleProposals.length - idx}`,
+        title: p.title || `${typeLabel} Revision & Technical Assessment`,
         completedDate: publishedDateStr,
         questionCount: parsedQuestions.length,
-        topic: "Technical & Placement Aptitude",
+        topic: typeLabel,
         questions: parsedQuestions,
         // Lifecycle metadata
         expiresAt: expiryDateStr,
@@ -90,7 +149,7 @@ export async function GET() {
     });
 
     if (historySets.length > 0 && !bannerNotice) {
-      bannerNotice = "⚠️ Notice: The current set of placement history questions has concluded its 1-month active period and is archived for revision.";
+      bannerNotice = "⚠️ Notice: History questions are archived for 1 month of revision and automatically purged after 30 days.";
     }
 
     return NextResponse.json({
