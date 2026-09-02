@@ -1,7 +1,7 @@
 import { NextResponse } from "next/server";
 import { cookies } from "next/headers";
 import { dbConnect } from "@/lib/db/dbConnect";
-import { ProposalModel, OfficeBearer, AuditLog } from "@/lib/db/models";
+import { ProposalModel, OfficeBearer, AuditLog, TestAttempt, TestAnswer, SecurityEvent } from "@/lib/db/models";
 import { getAuthenticatedUser } from "@/lib/authHelper";
 import mongoose from "mongoose";
 
@@ -489,6 +489,27 @@ export async function PUT(req: Request) {
         proposal.reviewedAt = new Date();
         proposal.isActive = true;
         await proposal.save();
+
+        // Clean old test attempts/scores for this activity type so reports start fresh for the newly published questions!
+        try {
+          if (proposal.type === "PLACEMENT_QUESTIONS" || proposal.type === "GENERAL_QUIZ") {
+            const oldAttempts = await TestAttempt.find({
+              activityType: proposal.type,
+            }).select("_id");
+
+            const oldAttemptIds = oldAttempts.map((a: any) => a._id);
+            if (oldAttemptIds.length > 0) {
+              await Promise.all([
+                TestAttempt.deleteMany({ _id: { $in: oldAttemptIds } }),
+                TestAnswer.deleteMany({ attemptId: { $in: oldAttemptIds } }),
+                SecurityEvent.deleteMany({ attemptId: { $in: oldAttemptIds } }),
+              ]);
+              console.log(`🧹 [CLEANUP] Deleted ${oldAttemptIds.length} old ${proposal.type} test reports on admin approval.`);
+            }
+          }
+        } catch (cleanErr) {
+          console.warn("Could not clean old test reports on admin approval:", cleanErr);
+        }
 
         await AuditLog.create({
           actorType: "ADMIN",

@@ -1,6 +1,6 @@
 import { NextResponse } from "next/server";
 import { dbConnect } from "@/lib/db/dbConnect";
-import { ProposalModel, AuditLog } from "@/lib/db/models";
+import { ProposalModel, AuditLog, TestAttempt, TestAnswer, SecurityEvent } from "@/lib/db/models";
 import { ACTIVE_PLACEMENT_SET, ACTIVE_QUIZ_SET } from "@/lib/studentState";
 import mongoose from "mongoose";
 
@@ -175,6 +175,25 @@ export async function POST(req: Request) {
           },
         }
       );
+
+      // Clean old test attempts/scores for this activity type so reports start fresh for the newly published questions!
+      try {
+        const oldAttempts = await TestAttempt.find({
+          activityType: dbType,
+        }).select("_id");
+
+        const oldAttemptIds = oldAttempts.map((a: any) => a._id);
+        if (oldAttemptIds.length > 0) {
+          await Promise.all([
+            TestAttempt.deleteMany({ _id: { $in: oldAttemptIds } }),
+            TestAnswer.deleteMany({ attemptId: { $in: oldAttemptIds } }),
+            SecurityEvent.deleteMany({ attemptId: { $in: oldAttemptIds } }),
+          ]);
+          console.log(`🧹 [CLEANUP] Deleted ${oldAttemptIds.length} old ${dbType} test reports upon publishing new assessment.`);
+        }
+      } catch (cleanErr) {
+        console.warn("Could not clean old test reports:", cleanErr);
+      }
     }
 
     const newProposal = await ProposalModel.create({

@@ -207,7 +207,16 @@ export async function POST(req: Request) {
 
     const startedAtDate = startedAt ? new Date(startedAt) : new Date();
 
-    // 5. Persist Attempt to MongoDB (Level 3: MongoDB Unique Index Enforced)
+    // 5. Persist Attempt to MongoDB: replace any previous report by this student so latest report is stored
+    try {
+      await TestAttempt.deleteMany({
+        studentEmailNormalized,
+        activityId: logicalActivityId,
+      });
+    } catch (cleanErr) {
+      console.warn("Could not remove previous attempt:", cleanErr);
+    }
+
     let createdAttemptId = `attempt-${Date.now()}`;
     try {
       const newAttempt = await TestAttempt.create({

@@ -348,7 +348,7 @@ export async function generateMembershipPDF(data: MembershipFormData): Promise<B
   });
 
   // Footer text
-  page.drawText("Microsoft Campus Club — Centralized Official Student Membership Form", {
+  page.drawText("Microsoft Campus Club - Centralized Official Student Membership Form", {
     x: 35,
     y: 28,
     size: 8.5,
@@ -360,9 +360,29 @@ export async function generateMembershipPDF(data: MembershipFormData): Promise<B
   return Buffer.from(pdfBytes);
 }
 
+export function sanitizePdfText(str: any): string {
+  if (str === null || str === undefined) return "";
+  return String(str)
+    .replace(/[\u2018\u2019]/g, "'") // smart single quotes
+    .replace(/[\u201C\u201D]/g, '"') // smart double quotes
+    .replace(/\u2014/g, "--")        // em-dash
+    .replace(/\u2013/g, "-")         // en-dash
+    .replace(/\u2022/g, "*")         // bullet
+    .replace(/\u2026/g, "...")       // ellipsis
+    .replace(/[\u2713\u2714]/g, "[OK]") // checkmark
+    .replace(/[\u2715\u2716]/g, "[X]")  // cross
+    .replace(/\u2192/g, "->")        // right arrow
+    .replace(/\u2190/g, "<-")        // left arrow
+    .replace(/\u2264/g, "<=")        // <=
+    .replace(/\u2265/g, ">=")        // >=
+    .replace(/\u2260/g, "!=")        // !=
+    .replace(/[^\x20-\x7E\r\n\t]/g, " "); // Replace any other non-ASCII char with space
+}
+
 function wrapText(text: string, maxChars: number): string[] {
   if (!text) return [];
-  const words = text.split(/\s+/);
+  const sanitized = sanitizePdfText(text);
+  const words = sanitized.split(/\s+/);
   const lines: string[] = [];
   let currentLine = "";
 
@@ -455,7 +475,7 @@ export async function generateHistoryQuestionsPDF(data: HistoryQuestionsPDFData)
       color: rgb(0, 0.47, 0.83),
     });
 
-    page.drawText("PLACEMENT QUESTIONS — REVISION ARCHIVE", {
+    page.drawText("PLACEMENT QUESTIONS - REVISION ARCHIVE", {
       x: 95,
       y: pageHeight - 68,
       size: 11,
@@ -625,7 +645,7 @@ export async function generateHistoryQuestionsPDF(data: HistoryQuestionsPDFData)
   for (let p = 0; p < totalPages; p++) {
     const page = pdfDoc.getPage(p);
     page.drawText(
-      `Microsoft Campus Club • Placement Preparation Repository • Page ${p + 1} of ${totalPages}`,
+      `Microsoft Campus Club - Placement Preparation Repository - Page ${p + 1} of ${totalPages}`,
       {
         x: 35,
         y: 28,
@@ -758,7 +778,7 @@ export async function generateQuizResultPDF(data: QuizResultPDFData): Promise<Bu
   });
 
   // Left column: Student Details
-  currentPage.drawText(`Student Name: ${data.studentName || "Student"}`, {
+  currentPage.drawText(`Student Name: ${sanitizePdfText(data.studentName || "Student")}`, {
     x: 45,
     y: currentY - 18,
     size: 10,
@@ -766,7 +786,7 @@ export async function generateQuizResultPDF(data: QuizResultPDFData): Promise<Bu
     color: rgb(0.05, 0.15, 0.3),
   });
 
-  currentPage.drawText(`Email: ${data.studentEmail || "N/A"}`, {
+  currentPage.drawText(`Email: ${sanitizePdfText(data.studentEmail || "N/A")}`, {
     x: 45,
     y: currentY - 33,
     size: 9,
@@ -775,7 +795,7 @@ export async function generateQuizResultPDF(data: QuizResultPDFData): Promise<Bu
   });
 
   currentPage.drawText(
-    `Dept: ${data.department || "General"} | Roll: ${data.rollNumber || "N/A"} | Year: ${data.year || "N/A"}`,
+    `Dept: ${sanitizePdfText(data.department || "General")} | Roll: ${sanitizePdfText(data.rollNumber || "N/A")} | Year: ${sanitizePdfText(data.year || "N/A")}`,
     {
       x: 45,
       y: currentY - 48,
@@ -785,7 +805,7 @@ export async function generateQuizResultPDF(data: QuizResultPDFData): Promise<Bu
     }
   );
 
-  currentPage.drawText(`Activity: ${data.testType} — ${data.testTitle || ""}`, {
+  currentPage.drawText(`Activity: ${sanitizePdfText(data.testType)} - ${sanitizePdfText(data.testTitle || "")}`, {
     x: 45,
     y: currentY - 65,
     size: 9,
@@ -874,7 +894,7 @@ export async function generateQuizResultPDF(data: QuizResultPDFData): Promise<Bu
       borderWidth: 1,
     });
 
-    currentPage.drawText(`Question ${i + 1} • ${item.isCorrect ? "CORRECT (+1)" : "INCORRECT (0)"}`, {
+    currentPage.drawText(`Question ${i + 1} - ${item.isCorrect ? "CORRECT (+1)" : "INCORRECT (0)"}`, {
       x: 45,
       y: currentY - 4,
       size: 8.5,
@@ -898,7 +918,7 @@ export async function generateQuizResultPDF(data: QuizResultPDFData): Promise<Bu
     currentY -= 4;
 
     // Student's answer
-    currentPage.drawText(`Your Answer: ${item.userAnswer || "(Unanswered)"}`, {
+    currentPage.drawText(`Your Answer: ${sanitizePdfText(item.userAnswer) || "(Unanswered)"}`, {
       x: 50,
       y: currentY,
       size: 9,
@@ -909,7 +929,7 @@ export async function generateQuizResultPDF(data: QuizResultPDFData): Promise<Bu
 
     // Correct Answer
     if (!item.isCorrect) {
-      currentPage.drawText(`Correct Answer: ${item.correctAnswer}`, {
+      currentPage.drawText(`Correct Answer: ${sanitizePdfText(item.correctAnswer)}`, {
         x: 50,
         y: currentY,
         size: 9,
@@ -955,7 +975,7 @@ export async function generateQuizResultPDF(data: QuizResultPDFData): Promise<Bu
   for (let p = 0; p < totalPages; p++) {
     const page = pdfDoc.getPage(p);
     page.drawText(
-      `Microsoft Campus Club • Official Evaluation Transcript • Page ${p + 1} of ${totalPages}`,
+      `Microsoft Campus Club - Official Evaluation Transcript - Page ${p + 1} of ${totalPages}`,
       {
         x: 35,
         y: 28,

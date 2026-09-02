@@ -259,7 +259,7 @@ export const PlacementTestRunner: React.FC<PlacementTestRunnerProps> = ({
 
       if (res.ok) {
         const blob = await res.blob();
-        const url = URL.createObjectURL(blob);
+        const url = window.URL.createObjectURL(blob);
         const link = document.createElement("a");
         link.href = url;
         const safeStudent = (report.username || "student").toLowerCase().replace(/[^a-z0-9]+/g, "-");
@@ -267,9 +267,10 @@ export const PlacementTestRunner: React.FC<PlacementTestRunnerProps> = ({
         document.body.appendChild(link);
         link.click();
         link.remove();
-        URL.revokeObjectURL(url);
+        window.URL.revokeObjectURL(url);
       } else {
-        alert("Failed to download placement result PDF.");
+        const errJson = await res.json().catch(() => ({}));
+        alert(`Failed to download placement result PDF: ${errJson.message || res.statusText || "Server error"}`);
       }
     } catch (e) {
       console.error("Result PDF error:", e);
