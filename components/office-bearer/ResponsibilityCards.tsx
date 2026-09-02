@@ -39,7 +39,7 @@ export const ResponsibilityCards: React.FC = () => {
     },
     "Technical Games": {
       description: "Coordinate hands-on micro-challenges, technical gaming rounds, and hardware speed coding events.",
-      href: "https://technical-game-homepage.vercel.app/#games",
+      href: "https://technical-game-homepage.vercel.app/",
       icon: Gamepad2,
       metrics: [
         { label: "Active Events", value: "2 Games" },

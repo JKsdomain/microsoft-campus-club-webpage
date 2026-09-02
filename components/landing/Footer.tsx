@@ -47,7 +47,7 @@ export const Footer: React.FC = () => {
               </li>
               <li>
                 <a
-                  href="https://technical-game-homepage.vercel.app/#games"
+                  href="https://technical-game-homepage.vercel.app/"
                   className="hover:text-[#0078D4] transition-colors"
                 >
                   Technical Games

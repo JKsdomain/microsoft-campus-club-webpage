@@ -181,7 +181,7 @@ export const TechnicalGamesManager: React.FC = () => {
               Launch and test the live games arena on the official Technical Games platform.
             </p>
             <Button
-              href="https://technical-game-homepage.vercel.app/#games"
+              href="https://technical-game-homepage.vercel.app/"
               variant="primary"
               size="md"
               className="w-full justify-center"

@@ -51,7 +51,7 @@ function StudentsCornerInner() {
   useEffect(() => {
     const tabParam = searchParams.get("tab") as TabType | null;
     if (tabParam === "technical-games") {
-      window.location.replace("https://technical-game-homepage.vercel.app/#games");
+      window.location.replace("https://technical-game-homepage.vercel.app/");
       return;
     }
     if (
@@ -331,7 +331,7 @@ function StudentsCornerInner() {
               return (
                 <a
                   key={t.id}
-                  href="https://technical-game-homepage.vercel.app/#games"
+                  href="https://technical-game-homepage.vercel.app/"
                   className="flex items-center space-x-2 px-4 py-2 rounded-xl text-xs font-semibold transition-all text-[#CBD5E1] hover:text-[#0078D4] dark:hover:text-white hover:bg-slate-100 dark:hover:bg-white/[0.06]"
                 >
                   <Icon className="w-4 h-4 text-[#22D3EE]" />
@@ -551,7 +551,7 @@ function StudentsCornerInner() {
                       </p>
                     </div>
                     <Button
-                      href="https://technical-game-homepage.vercel.app/#games"
+                      href="https://technical-game-homepage.vercel.app/"
                       variant="secondary"
                       size="md"
                       rightIcon={<ArrowRight className="w-4 h-4" />}
@@ -761,7 +761,7 @@ function StudentsCornerInner() {
                 </p>
               </div>
               <Button
-                href="https://technical-game-homepage.vercel.app/#games"
+                href="https://technical-game-homepage.vercel.app/"
                 variant="primary"
                 size="lg"
                 rightIcon={<ArrowRight className="w-4 h-4" />}

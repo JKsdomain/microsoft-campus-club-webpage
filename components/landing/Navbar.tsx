@@ -10,7 +10,7 @@ import { Button } from "../ui/Button";
 const NAV_ITEMS = [
   { label: "Home", href: "/" },
   { label: "Students Corner", href: "/students-corner" },
-  { label: "Technical Games", href: "https://technical-game-homepage.vercel.app/#games" },
+  { label: "Technical Games", href: "https://technical-game-homepage.vercel.app/" },
   { label: "Announcements", href: "/announcements" },
   { label: "About Us", href: "https://mcc-about-us-page.vercel.app/" },
 ];

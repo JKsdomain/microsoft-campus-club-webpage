@@ -52,7 +52,7 @@ export const OBSidebar: React.FC<OBSidebarProps> = ({
     },
     "Technical Games": {
       label: "Technical Games",
-      href: "https://technical-game-homepage.vercel.app/#games",
+      href: "https://technical-game-homepage.vercel.app/",
       icon: Gamepad2,
     },
     "Feed Community": {
@@ -193,7 +193,7 @@ export const OBSidebar: React.FC<OBSidebarProps> = ({
             <span>Feed</span>
           </Link>
           <a
-            href="https://technical-game-homepage.vercel.app/#games"
+            href="https://technical-game-homepage.vercel.app/"
             target="_blank"
             rel="noopener noreferrer"
             onClick={onCloseMobile}
