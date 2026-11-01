@@ -10,12 +10,13 @@ import {
 } from "@/lib/studentState";
 import { Clock, CheckCircle2, XCircle, ArrowRight, ArrowLeft, Download } from "lucide-react";
 import { Button } from "../ui/Button";
+import { QuestionText } from "../ui/QuestionText";
 
 interface QuizTestRunnerProps {
   studentInfo?: StudentInfo;
   username?: string;
   email?: string;
-  customQuestions?: { id: string; question: string; options: string[] }[];
+  customQuestions?: { id: string; question: string; options: string[]; isCode?: boolean }[];
   timerMinutes?: number;
   testTitle?: string;
   onFinishTest: (report: StudentResultReport) => void;
@@ -219,10 +220,22 @@ export const QuizTestRunner: React.FC<QuizTestRunnerProps> = ({
                     : "bg-red-500/5 border-red-500/20"
                 } space-y-3`}
               >
-                <div className="flex items-start justify-between">
-                  <h5 className="text-sm font-bold text-[#F8FAFC]">
-                    Q{idx + 1}. {item.questionText}
-                  </h5>
+                <div className="flex items-start justify-between gap-3">
+                  <div className="flex-1 min-w-0">
+                    <div className="flex items-center gap-2 mb-1">
+                      <span className="text-sm font-bold text-[#F8FAFC]">Q{idx + 1}.</span>
+                      {item.isCode && (
+                        <span className="px-1.5 py-0.5 rounded bg-[#0078D4]/20 text-[#22D3EE] font-mono text-[10px] font-bold">
+                          Code
+                        </span>
+                      )}
+                    </div>
+                    <QuestionText
+                      text={item.questionText}
+                      isCode={Boolean(item.isCode)}
+                      className="text-sm font-semibold text-[#F8FAFC]"
+                    />
+                  </div>
                   {item.isCorrect ? (
                     <span className="px-2.5 py-0.5 rounded-full text-xs font-semibold bg-emerald-500/10 text-emerald-400 border border-emerald-500/20 flex items-center space-x-1">
                       <CheckCircle2 className="w-3.5 h-3.5" />
@@ -284,9 +297,18 @@ export const QuizTestRunner: React.FC<QuizTestRunnerProps> = ({
 
       {/* Question Card */}
       <div className="p-6 sm:p-8 rounded-2xl bg-[#0D1B2A] border border-white/10 shadow-2xl space-y-6">
-        <h4 className="text-base sm:text-lg font-bold text-[#F8FAFC] leading-snug">
-          {currentQ.question}
-        </h4>
+        <div className="space-y-3">
+          {currentQ.isCode && (
+            <span className="inline-block px-2.5 py-0.5 rounded-full text-xs font-semibold bg-[#0078D4]/15 text-[#22D3EE] border border-[#0078D4]/30 font-mono">
+              Coding Question
+            </span>
+          )}
+          <QuestionText
+            text={currentQ.question}
+            isCode={Boolean(currentQ.isCode)}
+            className="text-base sm:text-lg font-bold text-[#F8FAFC] leading-snug"
+          />
+        </div>
 
         {/* Options */}
         <div className="space-y-3">

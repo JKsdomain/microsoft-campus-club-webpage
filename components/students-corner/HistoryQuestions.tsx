@@ -6,6 +6,7 @@ import { History, Calendar, CheckCircle2, Eye, ArrowLeft, BookOpen, HelpCircle, 
 import { Button } from "../ui/Button";
 import { EmptyState } from "../ui/EmptyState";
 import { LoadingState } from "../ui/LoadingState";
+import { QuestionText } from "../ui/QuestionText";
 
 export const HistoryQuestions: React.FC = () => {
   const [historySets, setHistorySets] = useState<HistorySet[]>([]);
@@ -162,9 +163,18 @@ export const HistoryQuestions: React.FC = () => {
                   </div>
 
                   {/* Question Text */}
-                  <p className="text-base text-[#F8FAFC] font-semibold leading-relaxed">
-                    {safeQuestionText}
-                  </p>
+                  <div className="space-y-2">
+                    {q.isCode ? (
+                      <span className="inline-block px-2.5 py-0.5 rounded-full text-xs font-semibold bg-[#0078D4]/15 text-[#22D3EE] border border-[#0078D4]/30 font-mono">
+                        Coding Question
+                      </span>
+                    ) : null}
+                    <QuestionText
+                      text={safeQuestionText}
+                      isCode={Boolean(q.isCode)}
+                      className="text-base text-[#F8FAFC] font-semibold leading-relaxed"
+                    />
+                  </div>
 
                   {/* Choices List */}
                   <div className="space-y-2.5">

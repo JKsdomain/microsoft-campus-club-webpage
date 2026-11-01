@@ -4,12 +4,14 @@ export interface TestQuestion {
   options: string[];
   correctAnswer: string;
   explanation: string;
+  isCode?: boolean;
 }
 
 export interface PublicTestQuestion {
   id: string;
   question: string;
   options: string[];
+  isCode?: boolean;
 }
 
 export interface StudentInfo {
@@ -57,6 +59,7 @@ export interface StudentResultReport {
     correctAnswer: string;
     isCorrect: boolean;
     explanation: string;
+    isCode?: boolean;
   }[];
 }
 
@@ -105,15 +108,21 @@ export const ACTIVE_PLACEMENT_SET: { title: string; timerMinutes: number; questi
     },
     {
       id: "q4",
-      question: "What property distinguishes an AVL tree from a standard Binary Search Tree?",
-      options: [
-        "Nodes must have exactly two children",
-        "The height difference between left and right subtrees of any node is at most 1",
-        "Keys are sorted in reverse chronological order",
-        "All leaf nodes are at identical depth",
-      ],
-      correctAnswer: "The height difference between left and right subtrees of any node is at most 1",
-      explanation: "AVL trees strictly maintain a balance factor of -1, 0, or +1 at every node through tree rotations.",
+      question: `What will be the output of the following C++ code snippet?
+
+#include <iostream>
+using namespace std;
+
+int main() {
+    int arr[] = {10, 20, 30, 40};
+    int *ptr = arr;
+    cout << *(ptr + 2) << endl;
+    return 0;
+}`,
+      options: ["30", "20", "40", "Garbage value"],
+      correctAnswer: "30",
+      explanation: "Pointer arithmetic (ptr + 2) offsets the pointer by 2 elements, pointing to arr[2] which holds 30.",
+      isCode: true,
     },
   ],
 };
@@ -128,6 +137,7 @@ export const ACTIVE_QUIZ_SET: { title: string; timerMinutes: number; questions: 
       options: ["Azure Virtual Machines", "Azure Functions", "Azure Blob Storage", "Azure SQL Database"],
       correctAnswer: "Azure Functions",
       explanation: "Azure Functions is a serverless compute service that lets you run event-triggered code without managing infrastructure.",
+      isCode: false,
     },
     {
       id: "qz2",
@@ -140,13 +150,23 @@ export const ACTIVE_QUIZ_SET: { title: string; timerMinutes: number; questions: 
       ],
       correctAnswer: "Identity and Access Management (IAM)",
       explanation: "Azure Entra ID is Microsoft's cloud-based identity and access management service.",
+      isCode: false,
     },
     {
       id: "qz3",
-      question: "Which database service in Azure provides multi-model globally distributed NoSQL capabilities?",
-      options: ["Azure SQL Managed Instance", "Azure Cosmos DB", "Azure Database for PostgreSQL", "Azure Cache for Redis"],
-      correctAnswer: "Azure Cosmos DB",
-      explanation: "Azure Cosmos DB is a fully managed globally distributed NoSQL and relational database service.",
+      question: `What will be the output of this Python code snippet?
+
+def modify_list(items):
+    items.append(4)
+    return items
+
+data = [1, 2, 3]
+modify_list(data)
+print(len(data))`,
+      options: ["4", "3", "Error", "None"],
+      correctAnswer: "4",
+      explanation: "Lists in Python are mutable and passed by reference; appending 4 modifies the original list to have 4 elements.",
+      isCode: true,
     },
   ],
 };
@@ -159,6 +179,7 @@ export function getPublicPlacementQuestions(): PublicTestQuestion[] {
     id: q.id,
     question: q.question,
     options: q.options,
+    isCode: Boolean(q.isCode),
   }));
 }
 
@@ -167,6 +188,7 @@ export function getPublicQuizQuestions(): PublicTestQuestion[] {
     id: q.id,
     question: q.question,
     options: q.options,
+    isCode: Boolean(q.isCode),
   }));
 }
 
@@ -209,6 +231,7 @@ export function evaluatePlacementSubmission(
       correctAnswer: q.correctAnswer,
       isCorrect,
       explanation: q.explanation,
+      isCode: Boolean(q.isCode),
     };
   });
 
@@ -273,6 +296,7 @@ export function evaluateQuizSubmission(
       correctAnswer: q.correctAnswer,
       isCorrect,
       explanation: q.explanation,
+      isCode: Boolean(q.isCode),
     };
   });
 

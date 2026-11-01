@@ -197,6 +197,7 @@ export async function POST(req: Request) {
         correctAnswer: q.correctAnswer,
         isCorrect,
         explanation: q.explanation || "",
+        isCode: Boolean(q.isCode),
       };
     });
 
@@ -296,6 +297,7 @@ export async function POST(req: Request) {
         correctAnswer: item.correctAnswer,
         isCorrect: item.isCorrect,
         explanation: item.explanation,
+        isCode: Boolean(item.isCode),
       })),
     };
 

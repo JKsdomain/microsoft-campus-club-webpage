@@ -171,6 +171,7 @@ const QuizQuestionSchema = new Schema(
     ],
     correctAnswer: { type: String, required: true }, // NEVER EXPOSED TO STUDENT
     explanation: { type: String, required: true },
+    isCode: { type: Boolean, default: false },
     questionOrder: { type: Number, default: 0 },
   },
   { timestamps: true }
@@ -222,6 +223,7 @@ const PlacementQuestionSchema = new Schema(
     ],
     correctAnswer: { type: String, required: true }, // NEVER EXPOSED TO STUDENT
     explanation: { type: String, required: true },
+    isCode: { type: Boolean, default: false },
     questionOrder: { type: Number, default: 0 },
   },
   { timestamps: true }
@@ -328,6 +330,7 @@ const TestAttemptSchema = new Schema(
         correctAnswer: { type: String, required: true },
         isCorrect: { type: Boolean, required: true },
         explanation: { type: String, required: true },
+        isCode: { type: Boolean, default: false },
       },
     ],
 

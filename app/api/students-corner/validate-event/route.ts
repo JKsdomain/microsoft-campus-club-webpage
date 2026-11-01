@@ -148,6 +148,7 @@ export async function POST(req: Request) {
             id: q.id,
             question: q.question,
             options: opts,
+            isCode: Boolean(q.isCode),
           };
         });
 
@@ -209,7 +210,12 @@ export async function POST(req: Request) {
       testTitle: fallbackTitle,
       timerMinutes: fallbackTimer,
       totalQuestions: fallbackQuestions.length,
-      questions: fallbackQuestions.map((q: any) => ({ id: q.id, question: q.question, options: q.options })),
+      questions: fallbackQuestions.map((q: any) => ({
+        id: q.id,
+        question: q.question,
+        options: q.options,
+        isCode: Boolean(q.isCode),
+      })),
     });
   } catch (error: any) {
     console.error("❌ [API /validate-event] Error:", error);

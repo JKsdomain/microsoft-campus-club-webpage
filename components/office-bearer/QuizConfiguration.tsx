@@ -6,6 +6,8 @@ import { useOBAuth } from "./OBAuthProvider";
 import { UnauthorizedGuard } from "./UnauthorizedGuard";
 import { Button } from "../ui/Button";
 import { LeaderboardPublishCard } from "./LeaderboardPublishCard";
+import { QuestionText } from "../ui/QuestionText";
+import { validateAndParseQuestionsCSV, generateValidSampleCSV } from "@/lib/csvParser";
 
 interface QuizConfigurationProps {
   activityType: "General Quiz" | "Placement Questions";
@@ -61,6 +63,7 @@ export const QuizConfiguration: React.FC<QuizConfigurationProps> = ({
   const [modalOption4, setModalOption4] = useState<string>("");
   const [modalCorrectAnswer, setModalCorrectAnswer] = useState<string>("");
   const [modalExplanation, setModalExplanation] = useState<string>("");
+  const [modalIsCode, setModalIsCode] = useState<boolean>(false);
 
   // Deadline Extension Modal State
   const [extendingSubmission, setExtendingSubmission] = useState<any | null>(null);
@@ -123,31 +126,6 @@ export const QuizConfiguration: React.FC<QuizConfigurationProps> = ({
     return <UnauthorizedGuard activityName={activityType} />;
   }
 
-  // CSV Row Parser helper handling quotes and commas
-  const parseCSVRow = (text: string): string[] => {
-    const result: string[] = [];
-    let cur = "";
-    let inQuotes = false;
-    for (let i = 0; i < text.length; i++) {
-      const c = text[i];
-      if (c === '"') {
-        if (inQuotes && text[i + 1] === '"') {
-          cur += '"';
-          i++;
-        } else {
-          inQuotes = !inQuotes;
-        }
-      } else if (c === "," && !inQuotes) {
-        result.push(cur.trim());
-        cur = "";
-      } else {
-        cur += c;
-      }
-    }
-    result.push(cur.trim());
-    return result;
-  };
-
   // Simulated File Upload & CSV Parsing Validation
   const handleFileUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
@@ -169,54 +147,27 @@ export const QuizConfiguration: React.FC<QuizConfigurationProps> = ({
     const reader = new FileReader();
     reader.onload = (event) => {
       const text = event.target?.result as string;
-      const lines = text.split("\n").filter((l) => l.trim().length > 0);
+      const parseResult = validateAndParseQuestionsCSV(text);
 
-      if (lines.length <= 1) {
-        setValidationError("The uploaded CSV file is empty or missing header rows.");
+      if (!parseResult.success) {
+        setValidationError(parseResult.error || "Failed to parse CSV file.");
+        setCsvFileName(null);
+        setCsvQuestionsCount(null);
+        setUploadedQuestions([]);
         setIsValidated(false);
         return;
       }
 
-      // Check Header
-      const header = lines[0].toLowerCase();
-      if (
-        !header.includes("question") ||
-        !header.includes("choice 1") ||
-        !header.includes("choice 2") ||
-        !header.includes("answer")
-      ) {
-        setValidationError(
-          "CSV headers missing required columns. Must include: Question, Choice 1, Choice 2, Choice 3, Choice 4, Answer, Explanation."
-        );
-        setIsValidated(false);
-        return;
-      }
+      const parsedList = parseResult.questions.map((q, idx) => ({
+        id: `q${idx + 1}`,
+        question: q.question,
+        options: q.options,
+        correctAnswer: q.correctAnswer,
+        explanation: q.explanation,
+        isCode: q.isCode,
+      }));
 
-      // Parse structured questions from all data rows
-      const parsedList: any[] = [];
-      for (let i = 1; i < lines.length; i++) {
-        const line = lines[i].trim();
-        if (!line) continue;
-        const cols = parseCSVRow(line);
-        if (cols.length >= 6) {
-          const qText = cols[0];
-          const choice1 = cols[1];
-          const choice2 = cols[2];
-          const choice3 = cols[3] || "N/A";
-          const choice4 = cols[4] || "N/A";
-          const answer = cols[5] || choice1;
-          const explanation = cols[6] || `Standard technical assessment explanation for question ${parsedList.length + 1}.`;
-          parsedList.push({
-            id: `q${parsedList.length + 1}`,
-            question: qText,
-            options: [choice1, choice2, choice3, choice4],
-            correctAnswer: answer,
-            explanation,
-          });
-        }
-      }
-
-      const detectedCount = parsedList.length || (lines.length - 1);
+      const detectedCount = parsedList.length;
       setCsvQuestionsCount(detectedCount);
       setCsvFileName(file.name);
       setUploadedQuestions(parsedList);
@@ -241,29 +192,47 @@ export const QuizConfiguration: React.FC<QuizConfigurationProps> = ({
     reader.readAsText(file);
   };
 
-  // Preset sample CSV loader for easy testing
+  // Preset sample CSV loader & downloader for easy testing
   const handleLoadSampleCSV = () => {
     setValidationError(null);
-    const sampleCount = questionsToUpload || 6;
-    const sampleQuestions: any[] = [];
-    for (let i = 1; i <= sampleCount; i++) {
-      sampleQuestions.push({
-        id: `q${i}`,
-        question: `Sample Technical Question #${i}: Core Assessment Assessment Topic ${i}?`,
-        options: [
-          `Option A for Question ${i}`,
-          `Option B for Question ${i} (Correct)`,
-          `Option C for Question ${i}`,
-          `Option D for Question ${i}`,
-        ],
-        correctAnswer: `Option B for Question ${i} (Correct)`,
-        explanation: `Detailed explanation and technical rationale for Question #${i}.`,
-      });
+    const sampleCsvText = generateValidSampleCSV(activityType);
+    const parseResult = validateAndParseQuestionsCSV(sampleCsvText);
+
+    if (parseResult.success) {
+      const sampleQuestions = parseResult.questions.map((q, idx) => ({
+        id: `q${idx + 1}`,
+        question: q.question,
+        options: q.options,
+        correctAnswer: q.correctAnswer,
+        explanation: q.explanation,
+        isCode: q.isCode,
+      }));
+
+      setUploadedQuestions(sampleQuestions);
+      setQuestionsToUpload(sampleQuestions.length);
+      if (questionsToDisplay > sampleQuestions.length) {
+        setQuestionsToDisplay(sampleQuestions.length);
+      }
+      setCsvQuestionsCount(sampleQuestions.length);
+      const sampleFileName = `${activityType.toLowerCase().replace(/\s+/g, "_")}_sample.csv`;
+      setCsvFileName(sampleFileName);
+      setIsValidated(true);
+
+      // Trigger download of the sample CSV file
+      try {
+        const blob = new Blob([sampleCsvText], { type: "text/csv;charset=utf-8;" });
+        const url = URL.createObjectURL(blob);
+        const link = document.createElement("a");
+        link.setAttribute("href", url);
+        link.setAttribute("download", sampleFileName);
+        document.body.appendChild(link);
+        link.click();
+        document.body.removeChild(link);
+        URL.revokeObjectURL(url);
+      } catch (err) {
+        console.warn("Could not auto-download sample CSV:", err);
+      }
     }
-    setUploadedQuestions(sampleQuestions);
-    setCsvQuestionsCount(sampleCount);
-    setCsvFileName(`${activityType.toLowerCase().replace(" ", "_")}_sample.csv`);
-    setIsValidated(true);
   };
 
   const validateTimeline = () => {
@@ -291,6 +260,7 @@ export const QuizConfiguration: React.FC<QuizConfigurationProps> = ({
     setModalOption4("");
     setModalCorrectAnswer("");
     setModalExplanation("");
+    setModalIsCode(false);
     setQuestionModalOpen(true);
   };
 
@@ -306,6 +276,7 @@ export const QuizConfiguration: React.FC<QuizConfigurationProps> = ({
     setModalOption4(opts[3] || "");
     setModalCorrectAnswer(q.correctAnswer || opts[0] || "");
     setModalExplanation(q.explanation || "");
+    setModalIsCode(Boolean(q.isCode));
     setQuestionModalOpen(true);
   };
 
@@ -340,18 +311,20 @@ export const QuizConfiguration: React.FC<QuizConfigurationProps> = ({
       nextList = [...uploadedQuestions];
       nextList[editingQuestionIndex] = {
         ...nextList[editingQuestionIndex],
-        question: modalQuestionText.trim(),
+        question: modalQuestionText,
         options: opts,
         correctAnswer: correct,
         explanation,
+        isCode: modalIsCode,
       };
     } else {
       const newQ = {
         id: `q${uploadedQuestions.length + 1}`,
-        question: modalQuestionText.trim(),
+        question: modalQuestionText,
         options: opts,
         correctAnswer: correct,
         explanation,
+        isCode: modalIsCode,
       };
       nextList = [...uploadedQuestions, newQ];
     }
@@ -731,7 +704,7 @@ export const QuizConfiguration: React.FC<QuizConfigurationProps> = ({
                     </p>
                   </div>
                   <div className="inline-block px-3 py-1 rounded-lg bg-white/5 border border-white/10 text-[11px] font-mono text-[#CBD5E1]">
-                    Required Columns: Question, Choice 1, Choice 2, Choice 3, Choice 4, Answer, Explanation
+                    Required Columns: Question, Choice 1, Choice 2, Choice 3, Choice 4, Answer, Explanation, Is Code
                   </div>
                 </div>
               </div>
@@ -800,13 +773,26 @@ export const QuizConfiguration: React.FC<QuizConfigurationProps> = ({
                       className="p-4 rounded-xl bg-[#07111F] border border-white/10 space-y-2.5 text-xs hover:border-white/20 transition-all"
                     >
                       <div className="flex items-start justify-between gap-2">
-                        <div className="flex items-start gap-2">
-                          <span className="px-2 py-0.5 rounded bg-[#0078D4]/20 text-[#22D3EE] font-mono font-bold text-[11px] flex-shrink-0">
-                            #{idx + 1}
-                          </span>
-                          <span className="font-semibold text-[#F8FAFC] leading-snug">
-                            {q.question}
-                          </span>
+                        <div className="flex-1 min-w-0">
+                          <div className="flex items-center gap-2 mb-1.5">
+                            <span className="px-2 py-0.5 rounded bg-[#0078D4]/20 text-[#22D3EE] font-mono font-bold text-[11px] flex-shrink-0">
+                              #{idx + 1}
+                            </span>
+                            {q.isCode ? (
+                              <span className="px-1.5 py-0.5 rounded bg-emerald-500/20 text-emerald-400 border border-emerald-500/30 font-mono font-semibold text-[10px]">
+                                Code Question
+                              </span>
+                            ) : (
+                              <span className="px-1.5 py-0.5 rounded bg-white/5 text-[#94A3B8] border border-white/10 font-mono text-[10px]">
+                                Text
+                              </span>
+                            )}
+                          </div>
+                          <QuestionText
+                            text={q.question}
+                            isCode={Boolean(q.isCode)}
+                            className="font-semibold text-[#F8FAFC] leading-snug"
+                          />
                         </div>
                         <div className="flex items-center space-x-1 flex-shrink-0">
                           <button
@@ -1179,16 +1165,33 @@ export const QuizConfiguration: React.FC<QuizConfigurationProps> = ({
 
             <form onSubmit={handleSaveModalQuestion} className="space-y-4 text-xs">
               <div>
-                <label className="block text-[#CBD5E1] font-semibold mb-1">
-                  Question Text <span className="text-red-400">*</span>
-                </label>
+                <div className="flex items-center justify-between mb-1">
+                  <label className="text-[#CBD5E1] font-semibold">
+                    Question Text <span className="text-red-400">*</span>
+                  </label>
+                  <label className="flex items-center space-x-1.5 cursor-pointer select-none text-[11px] text-[#22D3EE]">
+                    <input
+                      type="checkbox"
+                      checked={modalIsCode}
+                      onChange={(e) => setModalIsCode(e.target.checked)}
+                      className="rounded border-white/20 bg-[#07111F] text-[#0078D4] focus:ring-[#0078D4]"
+                    />
+                    <span>Is Code Question</span>
+                  </label>
+                </div>
                 <textarea
                   required
-                  rows={3}
+                  rows={4}
                   value={modalQuestionText}
                   onChange={(e) => setModalQuestionText(e.target.value)}
-                  placeholder="Enter the complete question prompt..."
-                  className="w-full p-2.5 rounded-xl bg-[#07111F] border border-white/15 text-[#F8FAFC] text-xs focus:outline-none focus:border-[#0078D4]"
+                  placeholder={
+                    modalIsCode
+                      ? "Enter code question with full indentation, line breaks, and symbols..."
+                      : "Enter the complete question prompt..."
+                  }
+                  className={`w-full p-2.5 rounded-xl bg-[#07111F] border border-white/15 text-[#F8FAFC] text-xs focus:outline-none focus:border-[#0078D4] ${
+                    modalIsCode ? "font-mono whitespace-pre" : ""
+                  }`}
                 />
               </div>
 

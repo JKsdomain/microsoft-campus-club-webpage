@@ -25,6 +25,7 @@ function normalizeQuestions(rawList: any[]): any[] {
       options: optionsList,
       correctAnswer,
       explanation,
+      isCode: Boolean(item.isCode),
     };
   });
 }

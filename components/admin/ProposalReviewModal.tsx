@@ -5,6 +5,7 @@ import { X, CheckCircle2, XCircle, Eye, FileText, Image as ImageIcon, HelpCircle
 import { Proposal } from "@/lib/adminState";
 import { ACTIVE_PLACEMENT_SET, ACTIVE_QUIZ_SET } from "@/lib/studentState";
 import { Button } from "../ui/Button";
+import { QuestionText } from "../ui/QuestionText";
 
 interface ProposalReviewModalProps {
   isOpen: boolean;
@@ -206,7 +207,19 @@ export const ProposalReviewModal: React.FC<ProposalReviewModalProps> = ({
                       <div className="space-y-3">
                         {quizQuestions.map((q: any, idx: number) => (
                           <div key={q.id || idx} className="p-3 rounded-lg bg-[#0D1B2A]/60 border border-white/5 space-y-2">
-                            <span className="font-bold text-[#22D3EE]">Q{idx + 1}. {q.question}</span>
+                            <div className="flex items-center gap-2">
+                              <span className="font-bold text-[#22D3EE]">Q{idx + 1}.</span>
+                              {q.isCode ? (
+                                <span className="px-1.5 py-0.5 rounded bg-blue-500/20 text-[#38BDF8] border border-blue-500/30 font-mono text-[10px] font-semibold">
+                                  Code
+                                </span>
+                              ) : (
+                                <span className="px-1.5 py-0.5 rounded bg-white/5 text-[#94A3B8] border border-white/10 font-mono text-[10px]">
+                                  Text
+                                </span>
+                              )}
+                            </div>
+                            <QuestionText text={q.question} isCode={Boolean(q.isCode)} className="text-[#F8FAFC] font-medium" />
                             <div className="pl-2 space-y-1 text-[#CBD5E1]">
                               {(q.options || []).map((opt: string, oIdx: number) => (
                                 <div key={oIdx} className={opt === q.correctAnswer ? "text-emerald-400 font-semibold" : ""}>
@@ -242,7 +255,19 @@ export const ProposalReviewModal: React.FC<ProposalReviewModalProps> = ({
                       <div className="space-y-3">
                         {placementQuestions.map((q: any, idx: number) => (
                           <div key={q.id || idx} className="p-3 rounded-lg bg-[#0D1B2A]/60 border border-white/5 space-y-2">
-                            <span className="font-bold text-[#22D3EE]">Q{idx + 1}. {q.question}</span>
+                            <div className="flex items-center gap-2">
+                              <span className="font-bold text-[#22D3EE]">Q{idx + 1}.</span>
+                              {q.isCode ? (
+                                <span className="px-1.5 py-0.5 rounded bg-blue-500/20 text-[#38BDF8] border border-blue-500/30 font-mono text-[10px] font-semibold">
+                                  Code
+                                </span>
+                              ) : (
+                                <span className="px-1.5 py-0.5 rounded bg-white/5 text-[#94A3B8] border border-white/10 font-mono text-[10px]">
+                                  Text
+                                </span>
+                              )}
+                            </div>
+                            <QuestionText text={q.question} isCode={Boolean(q.isCode)} className="text-[#F8FAFC] font-medium" />
                             <div className="pl-2 space-y-1 text-[#CBD5E1]">
                               {(q.options || []).map((opt: string, oIdx: number) => (
                                 <div key={oIdx} className={opt === q.correctAnswer ? "text-emerald-400 font-semibold" : ""}>

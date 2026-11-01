@@ -32,6 +32,7 @@ function normalizeQuestions(rawList: any[]): TestQuestion[] {
       options: optionsList,
       correctAnswer,
       explanation,
+      isCode: Boolean(item.isCode),
     };
   });
 }

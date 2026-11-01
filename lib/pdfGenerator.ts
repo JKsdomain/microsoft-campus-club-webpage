@@ -382,19 +382,28 @@ export function sanitizePdfText(str: any): string {
 function wrapText(text: string, maxChars: number): string[] {
   if (!text) return [];
   const sanitized = sanitizePdfText(text);
-  const words = sanitized.split(/\s+/);
+  const rawParagraphs = sanitized.split(/\r?\n/);
   const lines: string[] = [];
-  let currentLine = "";
 
-  for (const word of words) {
-    if ((currentLine + " " + word).trim().length <= maxChars) {
-      currentLine = (currentLine + " " + word).trim();
-    } else {
-      if (currentLine) lines.push(currentLine);
-      currentLine = word;
+  for (const para of rawParagraphs) {
+    if (!para.trim()) {
+      lines.push("");
+      continue;
     }
+    const words = para.split(/\s+/);
+    let currentLine = "";
+
+    for (const word of words) {
+      if ((currentLine + " " + word).trim().length <= maxChars) {
+        currentLine = (currentLine + " " + word).trim();
+      } else {
+        if (currentLine) lines.push(currentLine);
+        currentLine = word;
+      }
+    }
+    if (currentLine) lines.push(currentLine);
   }
-  if (currentLine) lines.push(currentLine);
+
   return lines;
 }
 

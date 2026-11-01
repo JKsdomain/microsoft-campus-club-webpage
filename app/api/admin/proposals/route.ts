@@ -172,7 +172,16 @@ export async function POST(req: Request) {
       questionsDetected,
       csvFileName,
       details: finalDetails,
-      questions: Array.isArray(questions) ? questions : [],
+      questions: Array.isArray(questions)
+        ? questions.map((q: any, idx: number) => ({
+            id: q.id || `q${idx + 1}`,
+            question: q.question,
+            options: Array.isArray(q.options) ? q.options : [],
+            correctAnswer: q.correctAnswer || (Array.isArray(q.options) ? q.options[0] : ""),
+            explanation: q.explanation || "",
+            isCode: Boolean(q.isCode),
+          }))
+        : [],
       // Feed-specific metadata
       mediaType: mediaType || "none",
       mediaUrl: mediaUrl || null,

@@ -140,7 +140,14 @@ export async function POST(req: Request) {
     }
 
     const dbType = mapTypeToDb(type);
-    const parsedQuestions = Array.isArray(questions) ? questions : [];
+    const parsedQuestions = (Array.isArray(questions) ? questions : []).map((q: any, idx: number) => ({
+      id: q.id || `q${idx + 1}`,
+      question: q.question,
+      options: Array.isArray(q.options) ? q.options : [],
+      correctAnswer: q.correctAnswer || (Array.isArray(q.options) ? q.options[0] : ""),
+      explanation: q.explanation || "",
+      isCode: Boolean(q.isCode),
+    }));
 
     const totalCount = parsedQuestions.length;
     const uploadCount = Number(questionsToUpload) || totalCount || 1;
