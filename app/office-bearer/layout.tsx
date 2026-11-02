@@ -58,6 +58,8 @@ function OBLayoutInner({ children }: { children: React.ReactNode }) {
         return "Feed Community";
       case "/office-bearer/feed":
         return "Common Feed";
+      case "/office-bearer/notices":
+        return "Notice Management";
       default:
         return "Office Bearer Portal";
     }

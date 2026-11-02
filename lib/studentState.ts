@@ -198,7 +198,9 @@ export function getPublicQuizQuestions(): PublicTestQuestion[] {
 export function evaluatePlacementSubmission(
   studentOrUsername: StudentInfo | string,
   emailOrAnswers?: string | Record<string, string>,
-  maybeAnswers?: Record<string, string>
+  maybeAnswers?: Record<string, string>,
+  customQuestions?: any[],
+  skippedQuestionIds?: string[]
 ): StudentResultReport {
   let studentInfo: StudentInfo | undefined;
   let username = "Student";
@@ -217,12 +219,28 @@ export function evaluatePlacementSubmission(
   }
 
   let correctCount = 0;
-  const questions = ACTIVE_PLACEMENT_SET.questions;
+  const questions = (Array.isArray(customQuestions) && customQuestions.length > 0)
+    ? customQuestions
+    : ACTIVE_PLACEMENT_SET.questions;
+  const skippedList: string[] = Array.isArray(skippedQuestionIds) ? skippedQuestionIds.map(String) : [];
 
   const details = questions.map((q) => {
-    const selected = userAnswers[q.id] || "No Answer Selected";
-    const isCorrect = selected === q.correctAnswer;
-    if (isCorrect) correctCount++;
+    const qIdStr = String(q.id);
+    const isSkipped = skippedList.includes(qIdStr);
+    let selected = "No Answer Selected";
+    let isCorrect = false;
+
+    if (isSkipped) {
+      selected = "Skipped (Don't Know)";
+      isCorrect = false;
+    } else if (userAnswers[q.id] !== undefined && userAnswers[q.id] !== null && String(userAnswers[q.id]).trim() !== "") {
+      selected = String(userAnswers[q.id]);
+      isCorrect = selected === q.correctAnswer;
+      if (isCorrect) correctCount++;
+    } else {
+      selected = "No Answer Selected";
+      isCorrect = false;
+    }
 
     return {
       questionId: q.id,
@@ -235,9 +253,9 @@ export function evaluatePlacementSubmission(
     };
   });
 
-  const total = questions.length;
-  const score = correctCount * 25;
+  const total = questions.length > 0 ? questions.length : 1;
   const percentage = Math.round((correctCount / total) * 100);
+  const score = percentage;
 
   return {
     attemptId: `placement-${Date.now()}`,
@@ -263,7 +281,9 @@ export function evaluatePlacementSubmission(
 export function evaluateQuizSubmission(
   studentOrUsername: StudentInfo | string,
   emailOrAnswers?: string | Record<string, string>,
-  maybeAnswers?: Record<string, string>
+  maybeAnswers?: Record<string, string>,
+  customQuestions?: any[],
+  skippedQuestionIds?: string[]
 ): StudentResultReport {
   let studentInfo: StudentInfo | undefined;
   let username = "Student";
@@ -282,12 +302,28 @@ export function evaluateQuizSubmission(
   }
 
   let correctCount = 0;
-  const questions = ACTIVE_QUIZ_SET.questions;
+  const questions = (Array.isArray(customQuestions) && customQuestions.length > 0)
+    ? customQuestions
+    : ACTIVE_QUIZ_SET.questions;
+  const skippedList: string[] = Array.isArray(skippedQuestionIds) ? skippedQuestionIds.map(String) : [];
 
   const details = questions.map((q) => {
-    const selected = userAnswers[q.id] || "No Answer Selected";
-    const isCorrect = selected === q.correctAnswer;
-    if (isCorrect) correctCount++;
+    const qIdStr = String(q.id);
+    const isSkipped = skippedList.includes(qIdStr);
+    let selected = "No Answer Selected";
+    let isCorrect = false;
+
+    if (isSkipped) {
+      selected = "Skipped (Don't Know)";
+      isCorrect = false;
+    } else if (userAnswers[q.id] !== undefined && userAnswers[q.id] !== null && String(userAnswers[q.id]).trim() !== "") {
+      selected = String(userAnswers[q.id]);
+      isCorrect = selected === q.correctAnswer;
+      if (isCorrect) correctCount++;
+    } else {
+      selected = "No Answer Selected";
+      isCorrect = false;
+    }
 
     return {
       questionId: q.id,
@@ -300,9 +336,9 @@ export function evaluateQuizSubmission(
     };
   });
 
-  const total = questions.length;
-  const score = Math.round((correctCount / total) * 100);
-  const percentage = score;
+  const total = questions.length > 0 ? questions.length : 1;
+  const percentage = Math.round((correctCount / total) * 100);
+  const score = percentage;
 
   return {
     attemptId: `quiz-${Date.now()}`,

@@ -11,7 +11,7 @@ export async function POST(req: Request) {
   try {
     await dbConnect();
     const body = await req.json();
-    const { testType, userAnswers, startedAt } = body;
+    const { testType, userAnswers, startedAt, questionIds, skippedQuestionIds } = body;
 
     // Handle studentInfo with legacy fallback
     const rawStudentInfo = body.studentInfo || {
@@ -175,10 +175,19 @@ export async function POST(req: Request) {
     let correctCount = 0;
     const answersMap = userAnswers || {};
     const answeredKeys = Object.keys(answersMap);
+    const skippedList: string[] = Array.isArray(skippedQuestionIds) ? skippedQuestionIds.map(String) : [];
 
-    // If the student was served a subset of questions (e.g. questionsToDisplay), evaluate against the served questions
+    // Prioritize exact served questionIds from the client to guarantee all questions are evaluated
     let evaluatedQuestions = questionList;
-    if (answeredKeys.length > 0) {
+    if (Array.isArray(questionIds) && questionIds.length > 0) {
+      const matching = questionIds
+        .map((id) => questionList.find((q) => String(q.id) === String(id)))
+        .filter((q): q is NonNullable<typeof q> => Boolean(q));
+      if (matching.length > 0) {
+        evaluatedQuestions = matching;
+      }
+    } else if (answeredKeys.length > 0) {
+      // Fallback for legacy requests without questionIds
       const matching = questionList.filter((q) => answeredKeys.includes(String(q.id)));
       if (matching.length > 0) {
         evaluatedQuestions = matching;
@@ -186,9 +195,23 @@ export async function POST(req: Request) {
     }
 
     const questionSnapshot = evaluatedQuestions.map((q) => {
-      const selected = answersMap[q.id] || "No Answer Selected";
-      const isCorrect = selected === q.correctAnswer;
-      if (isCorrect) correctCount++;
+      const qIdStr = String(q.id);
+      const isSkipped = skippedList.includes(qIdStr);
+      let selected = "No Answer Selected";
+      let isCorrect = false;
+
+      if (isSkipped) {
+        // Intentionally skipped using "Don't Know – Just Pass"
+        selected = "Skipped (Don't Know)";
+        isCorrect = false;
+      } else if (answersMap[q.id] !== undefined && answersMap[q.id] !== null && String(answersMap[q.id]).trim() !== "") {
+        selected = String(answersMap[q.id]);
+        isCorrect = selected === q.correctAnswer;
+        if (isCorrect) correctCount++;
+      } else {
+        selected = "No Answer Selected";
+        isCorrect = false;
+      }
 
       return {
         questionId: q.id,

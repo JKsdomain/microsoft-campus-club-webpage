@@ -20,6 +20,7 @@ import {
   Maximize2,
   Lock,
   AlertTriangle,
+  HelpCircle,
 } from "lucide-react";
 import { Button } from "../ui/Button";
 import { QuestionText } from "../ui/QuestionText";
@@ -62,6 +63,7 @@ export const PlacementTestRunner: React.FC<PlacementTestRunnerProps> = ({
     (timerMinutes || ACTIVE_PLACEMENT_SET.timerMinutes) * 60
   );
   const [report, setReport] = useState<StudentResultReport | null>(null);
+  const [skippedQuestions, setSkippedQuestions] = useState<string[]>([]);
 
   // Secure Test State & Violation Handling
   const [isFullscreen, setIsFullscreen] = useState(false);
@@ -70,9 +72,13 @@ export const PlacementTestRunner: React.FC<PlacementTestRunnerProps> = ({
   const [isTerminated, setIsTerminated] = useState(false);
 
   const containerRef = useRef<HTMLDivElement>(null);
-  const publicQuestions = (customQuestions && Array.isArray(customQuestions) && customQuestions.length > 0)
-    ? customQuestions
-    : getPublicPlacementQuestions();
+
+  // Dynamically reflect questions array with useMemo
+  const questions = React.useMemo(() => {
+    return customQuestions && Array.isArray(customQuestions) && customQuestions.length > 0
+      ? customQuestions
+      : getPublicPlacementQuestions();
+  }, [customQuestions]);
 
   // Helper to record security violation
   const recordViolation = (type: string, message: string) => {
@@ -214,6 +220,8 @@ export const PlacementTestRunner: React.FC<PlacementTestRunnerProps> = ({
           testType: "Placement Questions",
           studentInfo: effectiveStudentInfo,
           userAnswers,
+          questionIds: questions.map((q) => q.id),
+          skippedQuestionIds: skippedQuestions,
         }),
       });
 
@@ -224,13 +232,27 @@ export const PlacementTestRunner: React.FC<PlacementTestRunnerProps> = ({
       }
 
       const data = await res.json();
-      const generatedReport = data.report || evaluatePlacementSubmission(effectiveStudentInfo, userAnswers);
+      const generatedReport =
+        data.report ||
+        evaluatePlacementSubmission(
+          effectiveStudentInfo,
+          userAnswers,
+          undefined,
+          questions,
+          skippedQuestions
+        );
       setReport(generatedReport);
       onFinishTest(generatedReport);
     } catch (err) {
       console.error("Test submission network error:", err);
       // Fallback local evaluation only if network issue
-      const generatedReport = evaluatePlacementSubmission(effectiveStudentInfo, userAnswers);
+      const generatedReport = evaluatePlacementSubmission(
+        effectiveStudentInfo,
+        userAnswers,
+        undefined,
+        questions,
+        skippedQuestions
+      );
       setReport(generatedReport);
       onFinishTest(generatedReport);
     }
@@ -238,7 +260,18 @@ export const PlacementTestRunner: React.FC<PlacementTestRunnerProps> = ({
 
   const handleSelectAnswer = (questionId: string, option: string) => {
     if (report || isTerminated) return;
+    setSkippedQuestions((prev) => prev.filter((id) => id !== questionId));
     setUserAnswers((prev) => ({ ...prev, [questionId]: option }));
+  };
+
+  const handleSkipQuestion = (questionId: string) => {
+    if (report || isTerminated) return;
+    setUserAnswers((prev) => {
+      const next = { ...prev };
+      delete next[questionId];
+      return next;
+    });
+    setSkippedQuestions((prev) => (prev.includes(questionId) ? prev : [...prev, questionId]));
   };
 
   const [isDownloadingPDF, setIsDownloadingPDF] = useState(false);
@@ -283,8 +316,11 @@ export const PlacementTestRunner: React.FC<PlacementTestRunnerProps> = ({
 
   const minutes = Math.floor(timeLeftSeconds / 60);
   const seconds = timeLeftSeconds % 60;
-  const questions = publicQuestions;
-  const currentQ = questions[currentIdx];
+  const currentQ = questions[currentIdx] || questions[0];
+
+  const isCurrentAnswered = currentQ ? userAnswers[currentQ.id] !== undefined && userAnswers[currentQ.id] !== "" : false;
+  const isCurrentSkipped = currentQ ? skippedQuestions.includes(currentQ.id) : false;
+  const canProceed = isCurrentAnswered || isCurrentSkipped;
 
   // REPORT VIEW: Test completed
   if (report) {
@@ -365,6 +401,11 @@ export const PlacementTestRunner: React.FC<PlacementTestRunnerProps> = ({
                     <span className="px-2.5 py-0.5 rounded-full text-xs font-semibold bg-emerald-500/10 text-emerald-400 border border-emerald-500/20 flex items-center space-x-1">
                       <CheckCircle2 className="w-3.5 h-3.5" />
                       <span>Correct</span>
+                    </span>
+                  ) : item.userAnswer === "Skipped (Don't Know)" ? (
+                    <span className="px-2.5 py-0.5 rounded-full text-xs font-semibold bg-amber-500/10 text-amber-400 border border-amber-500/20 flex items-center space-x-1">
+                      <HelpCircle className="w-3.5 h-3.5" />
+                      <span>Skipped (Don&apos;t Know)</span>
                     </span>
                   ) : (
                     <span className="px-2.5 py-0.5 rounded-full text-xs font-semibold bg-red-500/10 text-red-400 border border-red-500/20 flex items-center space-x-1">
@@ -551,7 +592,7 @@ export const PlacementTestRunner: React.FC<PlacementTestRunnerProps> = ({
         </div>
 
         {/* Navigation & Submit Buttons */}
-        <div className="pt-4 border-t border-white/10 flex items-center justify-between">
+        <div className="pt-4 border-t border-white/10 flex flex-wrap items-center justify-between gap-3">
           <Button
             onClick={() => setCurrentIdx((i) => Math.max(0, i - 1))}
             disabled={currentIdx === 0}
@@ -562,25 +603,54 @@ export const PlacementTestRunner: React.FC<PlacementTestRunnerProps> = ({
             Previous
           </Button>
 
-          {currentIdx < questions.length - 1 ? (
-            <Button
-              onClick={() => setCurrentIdx((i) => Math.min(questions.length - 1, i + 1))}
-              variant="primary"
-              size="md"
-              rightIcon={<ArrowRight className="w-4 h-4" />}
+          <div className="flex items-center gap-2">
+            <button
+              type="button"
+              onClick={() => handleSkipQuestion(currentQ.id)}
+              className={`px-3.5 py-2 rounded-xl text-xs font-semibold transition-all flex items-center gap-1.5 border cursor-pointer select-none ${
+                isCurrentSkipped
+                  ? "bg-amber-500/25 border-amber-400 text-amber-200 shadow-md shadow-amber-500/20 ring-1 ring-amber-400/40"
+                  : "bg-white/5 border-white/15 text-[#94A3B8] hover:border-amber-500/40 hover:text-amber-300 hover:bg-amber-500/10"
+              }`}
             >
-              Next
-            </Button>
-          ) : (
-            <Button
-              onClick={handleSubmitTest}
-              variant="primary"
-              size="md"
-              className="bg-emerald-600 hover:bg-emerald-500 border-emerald-500"
-            >
-              Submit Placement Test
-            </Button>
-          )}
+              <HelpCircle className="w-3.5 h-3.5" />
+              <span>Don&apos;t Know – Just Pass</span>
+              {isCurrentSkipped && <span className="text-amber-400 font-bold ml-0.5">✓</span>}
+            </button>
+
+            {currentIdx < questions.length - 1 ? (
+              <Button
+                onClick={() => {
+                  if (canProceed) {
+                    setCurrentIdx((i) => Math.min(questions.length - 1, i + 1));
+                  }
+                }}
+                disabled={!canProceed}
+                variant="primary"
+                size="md"
+                rightIcon={<ArrowRight className="w-4 h-4" />}
+                className={!canProceed ? "opacity-40 cursor-not-allowed" : ""}
+              >
+                Next
+              </Button>
+            ) : (
+              <Button
+                onClick={() => {
+                  if (canProceed) {
+                    handleSubmitTest();
+                  }
+                }}
+                disabled={!canProceed}
+                variant="primary"
+                size="md"
+                className={`bg-emerald-600 hover:bg-emerald-500 border-emerald-500 ${
+                  !canProceed ? "opacity-40 cursor-not-allowed" : ""
+                }`}
+              >
+                Submit Placement Test
+              </Button>
+            )}
+          </div>
         </div>
       </div>
     </div>

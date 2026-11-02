@@ -14,6 +14,7 @@ import {
   X,
   ShieldAlert,
   History,
+  Megaphone,
 } from "lucide-react";
 import { useOBAuth } from "./OBAuthProvider";
 
@@ -64,7 +65,26 @@ export const OBSidebar: React.FC<OBSidebarProps> = ({
 
   // STRICT RULE: Exactly ONE assigned responsibility
   const assignedName = currentOb.assignedResponsibility;
-  const singleRouteMeta = assignedName !== "Unassigned" ? ACTIVITY_ROUTES[assignedName] : null;
+
+  const isNoticeResponsibility =
+    assignedName === "Quiz Notice" ||
+    assignedName === "Event Notice" ||
+    assignedName === "Quiz Winners Notice" ||
+    assignedName === "Active Participants Notice" ||
+    assignedName === "Placement Questions Notice";
+
+  const noticeRouteMeta = isNoticeResponsibility
+    ? {
+        label:
+          assignedName === "Event Notice" && currentOb.assignedEvent
+            ? `Event: ${currentOb.assignedEvent.name}`
+            : assignedName,
+        href: "/office-bearer/notices",
+        icon: Megaphone,
+      }
+    : null;
+
+  const singleRouteMeta = noticeRouteMeta || (assignedName !== "Unassigned" ? ACTIVITY_ROUTES[assignedName] : null);
 
   const navContent = (
     <div className="flex flex-col h-full bg-[#0D1B2A] border-r border-white/10 w-64 p-5 text-[#CBD5E1]">

@@ -14,6 +14,7 @@ import {
   Info,
   LogOut,
   X,
+  FileText,
 } from "lucide-react";
 import { useAdminAuth } from "./AdminAuthProvider";
 
@@ -22,6 +23,7 @@ const ADMIN_NAV_ITEMS = [
   { label: "User Management", href: "/admin/user-management", icon: Users },
   { label: "Responsibility Management", href: "/admin/responsibilities", icon: ClipboardList },
   { label: "Approval Workflow", href: "/admin/approvals", icon: CheckCircle2 },
+  { label: "Notice Management", href: "/admin/notices", icon: FileText },
   { label: "Announcements", href: "/admin/announcements", icon: Megaphone },
   { label: "Audit & Logs", href: "/admin/audit-logs", icon: FileClock },
   { label: "Data Cleanup", href: "/admin/data-cleanup", icon: Trash2 },

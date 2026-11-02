@@ -37,6 +37,12 @@ const OfficeBearerSchema = new Schema(
       default: null,
       index: true,
     },
+    assignedEventId: {
+      type: Schema.Types.ObjectId,
+      ref: "notice_events",
+      default: null,
+      index: true,
+    },
     role: { type: String, default: "OFFICE_BEARER" },
     status: { type: String, enum: ["ACTIVE", "INACTIVE"], default: "ACTIVE" },
     lastLoginAt: { type: Date, default: null },
@@ -477,6 +483,79 @@ const SystemSettingSchema = new Schema(
   { timestamps: true }
 );
 
+// 20. NOTICE_EVENTS (Sub-responsibilities under Event Notice)
+const NoticeEventSchema = new Schema(
+  {
+    name: { type: String, required: true, trim: true },
+    description: { type: String, default: "" },
+    assignedObId: {
+      type: Schema.Types.ObjectId,
+      ref: "office_bearers",
+      default: null,
+      index: true,
+    },
+    status: { type: String, enum: ["ACTIVE", "INACTIVE"], default: "ACTIVE" },
+  },
+  { timestamps: true }
+);
+
+// 21. NOTICES (Notice Management System)
+const NoticeSchema = new Schema(
+  {
+    title: { type: String, required: true, trim: true },
+    noticeType: {
+      type: String,
+      enum: [
+        "QUIZ_NOTICE",
+        "EVENT_NOTICE",
+        "QUIZ_WINNERS_NOTICE",
+        "ACTIVE_PARTICIPANTS_NOTICE",
+        "PLACEMENT_QUESTIONS_NOTICE",
+      ],
+      required: true,
+      index: true,
+    },
+    eventId: {
+      type: Schema.Types.ObjectId,
+      ref: "notice_events",
+      default: null,
+      index: true,
+    },
+    eventName: { type: String, default: null },
+    obId: {
+      type: Schema.Types.ObjectId,
+      ref: "office_bearers",
+      required: true,
+      index: true,
+    },
+    obName: { type: String, required: true },
+    contentData: {
+      type: Schema.Types.Mixed,
+      required: true,
+      default: {},
+    },
+    status: {
+      type: String,
+      enum: [
+        "DRAFT",
+        "PENDING_APPROVAL",
+        "APPROVED",
+        "PUBLISHED",
+        "REJECTED",
+        "UNPUBLISHED",
+      ],
+      default: "DRAFT",
+      index: true,
+    },
+    rejectionReason: { type: String, default: null },
+    reviewedBy: { type: Schema.Types.ObjectId, ref: "admins", default: null },
+    reviewedAt: { type: Date, default: null },
+    publishedAt: { type: Date, default: null },
+    pdfUrl: { type: String, default: null },
+  },
+  { timestamps: true }
+);
+
 // Register Models safely for Next.js hot-reloading
 export const Admin = (mongoose.models.admins as Model<any>) || mongoose.model("admins", AdminSchema);
 export const Responsibility = (mongoose.models.responsibilities as Model<any>) || mongoose.model("responsibilities", ResponsibilitySchema);
@@ -497,3 +576,5 @@ export const LeaderboardEntryModel = (mongoose.models.leaderboard_entries as Mod
 export const AuditLog = (mongoose.models.audit_logs as Model<any>) || mongoose.model("audit_logs", AuditLogSchema);
 export const SecurityEvent = (mongoose.models.security_events as Model<any>) || mongoose.model("security_events", SecurityEventSchema);
 export const SystemSetting = (mongoose.models.system_settings as Model<any>) || mongoose.model("system_settings", SystemSettingSchema);
+export const NoticeEvent = (mongoose.models.notice_events as Model<any>) || mongoose.model("notice_events", NoticeEventSchema);
+export const Notice = (mongoose.models.notices as Model<any>) || mongoose.model("notices", NoticeSchema);

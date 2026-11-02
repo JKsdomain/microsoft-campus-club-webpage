@@ -4,7 +4,20 @@ export interface OBProfile {
   email: string;
   department: string;
   // STRICT RULE: ONE Office Bearer -> ONE Responsibility
-  assignedResponsibility: "Placement Questions" | "General Quiz" | "Technical Games" | "Feed Community" | "Unassigned";
+  assignedResponsibility:
+    | "Placement Questions"
+    | "General Quiz"
+    | "Technical Games"
+    | "Feed Community"
+    | "Quiz Notice"
+    | "Event Notice"
+    | "Quiz Winners Notice"
+    | "Active Participants Notice"
+    | "Placement Questions Notice"
+    | "Unassigned"
+    | string;
+  responsibilityCode?: string;
+  assignedEvent?: { id: string; name: string } | null;
 }
 
 export interface QuizSubmission {

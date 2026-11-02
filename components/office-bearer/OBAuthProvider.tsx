@@ -17,7 +17,7 @@ interface OBAuthContextType {
   loginOb: (email: string, obData?: Partial<OBProfile>) => void;
   logoutOb: () => void;
   switchObPersona: (obId: string) => void;
-  hasResponsibility: (activityName: "Placement Questions" | "General Quiz" | "Technical Games" | "Feed Community") => boolean;
+  hasResponsibility: (activityName: string) => boolean;
 
   submissions: QuizSubmission[];
   submitQuizProposal: (submission: Omit<QuizSubmission, "id" | "submittedBy" | "submittedDate" | "status">) => Promise<void>;
@@ -123,6 +123,8 @@ export const OBAuthProvider: React.FC<{ children: React.ReactNode }> = ({ childr
               email: userObj.email || "",
               department: userObj.department || "Computer Science & Engineering",
               assignedResponsibility: userObj.responsibility || "Unassigned",
+              responsibilityCode: userObj.responsibilityCode,
+              assignedEvent: userObj.assignedEvent,
             });
           } else {
             setIsAuthenticated(false);
@@ -153,6 +155,8 @@ export const OBAuthProvider: React.FC<{ children: React.ReactNode }> = ({ childr
       email: email,
       department: obData?.department || "Computer Science & Engineering",
       assignedResponsibility: obData?.assignedResponsibility || "Unassigned",
+      responsibilityCode: obData?.responsibilityCode,
+      assignedEvent: obData?.assignedEvent,
     };
     setCurrentOb(newOb);
   };
@@ -174,14 +178,12 @@ export const OBAuthProvider: React.FC<{ children: React.ReactNode }> = ({ childr
     }
   };
 
-  const hasResponsibility = (
-    activityName: "Placement Questions" | "General Quiz" | "Technical Games" | "Feed Community"
-  ): boolean => {
+  const hasResponsibility = (activityName: string): boolean => {
     // Technical Games is no longer restricted to 1:1 assignment
     if (activityName === "Technical Games") {
       return true;
     }
-    // STRICT RULE: EXACTLY ONE RESPONSIBILITY for Quiz, Placement, Feed
+    // STRICT RULE: EXACTLY ONE RESPONSIBILITY
     return currentOb.assignedResponsibility === activityName;
   };
 

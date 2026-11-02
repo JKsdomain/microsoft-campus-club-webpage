@@ -8,7 +8,7 @@ import {
   getPublicQuizQuestions,
   evaluateQuizSubmission,
 } from "@/lib/studentState";
-import { Clock, CheckCircle2, XCircle, ArrowRight, ArrowLeft, Download } from "lucide-react";
+import { Clock, CheckCircle2, XCircle, ArrowRight, ArrowLeft, Download, HelpCircle } from "lucide-react";
 import { Button } from "../ui/Button";
 import { QuestionText } from "../ui/QuestionText";
 
@@ -46,18 +46,20 @@ export const QuizTestRunner: React.FC<QuizTestRunnerProps> = ({
   const [timeLeftSeconds, setTimeLeftSeconds] = useState(totalDuration);
   const [report, setReport] = useState<StudentResultReport | null>(null);
 
-  // Stabilize questions array so ordering and choices never regenerate on re-renders
-  const publicQuestions = (customQuestions && Array.isArray(customQuestions) && customQuestions.length > 0)
-    ? customQuestions
-    : getPublicQuizQuestions();
+  const [skippedQuestions, setSkippedQuestions] = useState<string[]>([]);
 
-  const [questions] = useState(() => publicQuestions);
+  // Dynamically reflect questions array with useMemo (matching PlacementTestRunner)
+  const questions = React.useMemo(() => {
+    return customQuestions && Array.isArray(customQuestions) && customQuestions.length > 0
+      ? customQuestions
+      : getPublicQuizQuestions();
+  }, [customQuestions]);
 
   // Timestamp-based elapsed timer to maintain accurate countdown across tab/window switches
   const startTimeRef = React.useRef<number | null>(null);
   const submittedRef = React.useRef(false);
 
-  const handleSubmitQuiz = React.useCallback(async () => {
+  const handleSubmitQuiz = React.useCallback(async (isAutoSubmit = false) => {
     if (submittedRef.current) return;
     submittedRef.current = true;
 
@@ -69,6 +71,8 @@ export const QuizTestRunner: React.FC<QuizTestRunnerProps> = ({
           testType: "General Quiz",
           studentInfo: effectiveStudentInfo,
           userAnswers,
+          questionIds: questions.map((q) => q.id),
+          skippedQuestionIds: skippedQuestions,
         }),
       });
 
@@ -79,16 +83,30 @@ export const QuizTestRunner: React.FC<QuizTestRunnerProps> = ({
       }
 
       const data = await res.json();
-      const generatedReport = data.report || evaluateQuizSubmission(effectiveStudentInfo, userAnswers);
+      const generatedReport =
+        data.report ||
+        evaluateQuizSubmission(
+          effectiveStudentInfo,
+          userAnswers,
+          undefined,
+          questions,
+          skippedQuestions
+        );
       setReport(generatedReport);
       onFinishTest(generatedReport);
     } catch (err) {
       console.error("Quiz submission network error:", err);
-      const generatedReport = evaluateQuizSubmission(effectiveStudentInfo, userAnswers);
+      const generatedReport = evaluateQuizSubmission(
+        effectiveStudentInfo,
+        userAnswers,
+        undefined,
+        questions,
+        skippedQuestions
+      );
       setReport(generatedReport);
       onFinishTest(generatedReport);
     }
-  }, [effectiveStudentInfo, userAnswers, onFinishTest]);
+  }, [effectiveStudentInfo, userAnswers, questions, skippedQuestions, onFinishTest]);
 
   useEffect(() => {
     if (report) return;
@@ -103,7 +121,7 @@ export const QuizTestRunner: React.FC<QuizTestRunnerProps> = ({
       setTimeLeftSeconds(remaining);
 
       if (remaining <= 0 && !submittedRef.current) {
-        handleSubmitQuiz();
+        handleSubmitQuiz(true);
       }
     };
 
@@ -125,12 +143,27 @@ export const QuizTestRunner: React.FC<QuizTestRunnerProps> = ({
 
   const handleSelectAnswer = (questionId: string, option: string) => {
     if (report) return;
+    setSkippedQuestions((prev) => prev.filter((id) => id !== questionId));
     setUserAnswers((prev) => ({ ...prev, [questionId]: option }));
+  };
+
+  const handleSkipQuestion = (questionId: string) => {
+    if (report) return;
+    setUserAnswers((prev) => {
+      const next = { ...prev };
+      delete next[questionId];
+      return next;
+    });
+    setSkippedQuestions((prev) => (prev.includes(questionId) ? prev : [...prev, questionId]));
   };
 
   const minutes = Math.floor(timeLeftSeconds / 60);
   const seconds = timeLeftSeconds % 60;
-  const currentQ = questions[currentIdx];
+  const currentQ = questions[currentIdx] || questions[0];
+
+  const isCurrentAnswered = currentQ ? userAnswers[currentQ.id] !== undefined && userAnswers[currentQ.id] !== "" : false;
+  const isCurrentSkipped = currentQ ? skippedQuestions.includes(currentQ.id) : false;
+  const canProceed = isCurrentAnswered || isCurrentSkipped;
 
   const [isDownloadingPDF, setIsDownloadingPDF] = useState(false);
 
@@ -241,6 +274,11 @@ export const QuizTestRunner: React.FC<QuizTestRunnerProps> = ({
                       <CheckCircle2 className="w-3.5 h-3.5" />
                       <span>Correct</span>
                     </span>
+                  ) : item.userAnswer === "Skipped (Don't Know)" ? (
+                    <span className="px-2.5 py-0.5 rounded-full text-xs font-semibold bg-amber-500/10 text-amber-400 border border-amber-500/20 flex items-center space-x-1">
+                      <HelpCircle className="w-3.5 h-3.5" />
+                      <span>Skipped (Don&apos;t Know)</span>
+                    </span>
                   ) : (
                     <span className="px-2.5 py-0.5 rounded-full text-xs font-semibold bg-red-500/10 text-red-400 border border-red-500/20 flex items-center space-x-1">
                       <XCircle className="w-3.5 h-3.5" />
@@ -338,7 +376,7 @@ export const QuizTestRunner: React.FC<QuizTestRunnerProps> = ({
         </div>
 
         {/* Navigation */}
-        <div className="pt-4 border-t border-white/10 flex items-center justify-between">
+        <div className="pt-4 border-t border-white/10 flex flex-wrap items-center justify-between gap-3">
           <Button
             onClick={() => setCurrentIdx((i) => Math.max(0, i - 1))}
             disabled={currentIdx === 0}
@@ -349,25 +387,55 @@ export const QuizTestRunner: React.FC<QuizTestRunnerProps> = ({
             Previous
           </Button>
 
-          {currentIdx < questions.length - 1 ? (
-            <Button
-              onClick={() => setCurrentIdx((i) => Math.min(questions.length - 1, i + 1))}
-              variant="primary"
-              size="md"
-              rightIcon={<ArrowRight className="w-4 h-4" />}
+          <div className="flex items-center gap-2">
+            <button
+              type="button"
+              onClick={() => handleSkipQuestion(currentQ.id)}
+              className={`px-3.5 py-2 rounded-xl text-xs font-semibold transition-all flex items-center gap-1.5 border cursor-pointer select-none ${
+                isCurrentSkipped
+                  ? "bg-amber-500/25 border-amber-400 text-amber-200 shadow-md shadow-amber-500/20 ring-1 ring-amber-400/40"
+                  : "bg-white/5 border-white/15 text-[#94A3B8] hover:border-amber-500/40 hover:text-amber-300 hover:bg-amber-500/10"
+              }`}
             >
-              Next
-            </Button>
-          ) : (
-            <Button
-              onClick={handleSubmitQuiz}
-              variant="primary"
-              size="md"
-              className="bg-emerald-600 hover:bg-emerald-500 border-emerald-500"
-            >
-              Submit Quiz
-            </Button>
-          )}
+              <HelpCircle className="w-3.5 h-3.5" />
+              <span>Don&apos;t Know – Just Pass</span>
+              {isCurrentSkipped && <span className="text-amber-400 font-bold ml-0.5">✓</span>}
+            </button>
+
+            {currentIdx < questions.length - 1 ? (
+              <Button
+                onClick={() => {
+                  if (canProceed) {
+                    setCurrentIdx((i) => Math.min(questions.length - 1, i + 1));
+                  }
+                }}
+                disabled={!canProceed}
+                variant="primary"
+                size="md"
+                rightIcon={<ArrowRight className="w-4 h-4" />}
+                className={!canProceed ? "opacity-40 cursor-not-allowed" : ""}
+              >
+                Next
+              </Button>
+            ) : (
+              <Button
+                onClick={() => {
+                  if (canProceed) {
+                    handleSubmitQuiz();
+                  }
+                }}
+                disabled={!canProceed}
+                variant="primary"
+                size="md"
+                className={`bg-emerald-600 hover:bg-emerald-500 border-emerald-500 ${
+                  !canProceed ? "opacity-40 cursor-not-allowed" : ""
+                }`}
+                leftIcon={<CheckCircle2 className="w-4 h-4" />}
+              >
+                Submit Quiz
+              </Button>
+            )}
+          </div>
         </div>
       </div>
     </div>

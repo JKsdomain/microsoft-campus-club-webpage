@@ -92,11 +92,12 @@ export async function PUT(req: Request) {
     // 3a. Clear any OB currently assigned to THIS responsibility
     await OfficeBearer.updateMany(
       { responsibilityId: responsibility._id },
-      { $set: { responsibilityId: null } }
+      { $set: { responsibilityId: null, assignedEventId: null } }
     );
 
     // 4. Assign the selected OB to this responsibility
     selectedOb.responsibilityId = responsibility._id;
+    selectedOb.assignedEventId = null;
     await selectedOb.save();
 
     // 5. Write Audit Log
@@ -150,13 +151,17 @@ export async function PUT(req: Request) {
     });
 
     // Also return updated OB list so frontend can sync
-    const allObs = await OfficeBearer.find().populate("responsibilityId").sort({ createdAt: -1 });
+    const allObs = await OfficeBearer.find().populate("responsibilityId").populate("assignedEventId").sort({ createdAt: -1 });
     const formattedObs = allObs.map((ob: any) => ({
       id: String(ob._id),
       name: ob.name,
       email: ob.email,
       department: ob.department || "Computer Science & Engineering",
-      responsibility: ob.responsibilityId ? ob.responsibilityId.name : "Unassigned",
+      responsibility: ob.assignedEventId && ob.assignedEventId.name
+        ? `Event Notice: ${ob.assignedEventId.name}`
+        : ob.responsibilityId
+        ? ob.responsibilityId.name
+        : "Unassigned",
       status: ob.status === "ACTIVE" ? "Active" : "Inactive",
       joinedDate: ob.createdAt ? new Date(ob.createdAt).toISOString().split("T")[0] : new Date().toISOString().split("T")[0],
     }));

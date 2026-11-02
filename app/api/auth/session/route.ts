@@ -50,13 +50,26 @@ export async function GET() {
         void Responsibility;
         const obFound = await OfficeBearer.findOne({
           email: { $regex: new RegExp(`^${escapedEmail}$`, "i") },
-        }).populate("responsibilityId");
+        }).populate("responsibilityId").populate("assignedEventId");
 
         if (obFound && obFound.status?.toUpperCase() !== "INACTIVE") {
           const respName =
             obFound.responsibilityId && typeof obFound.responsibilityId === "object"
               ? (obFound.responsibilityId as any).name || "Unassigned"
               : "Unassigned";
+
+          const respCode =
+            obFound.responsibilityId && typeof obFound.responsibilityId === "object"
+              ? (obFound.responsibilityId as any).code || null
+              : null;
+
+          const assignedEvent =
+            obFound.assignedEventId && typeof obFound.assignedEventId === "object"
+              ? {
+                  id: String((obFound.assignedEventId as any)._id),
+                  name: (obFound.assignedEventId as any).name,
+                }
+              : null;
 
           return NextResponse.json({
             authenticated: true,
@@ -68,6 +81,8 @@ export async function GET() {
               email: obFound.email,
               department: obFound.department || "Computer Science & Engineering",
               responsibility: respName,
+              responsibilityCode: respCode,
+              assignedEvent,
               role: "OFFICE_BEARER",
             },
           });
