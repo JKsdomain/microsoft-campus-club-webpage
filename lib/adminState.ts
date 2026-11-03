@@ -122,6 +122,46 @@ export const INITIAL_ASSIGNMENTS: ActivityAssignment[] = [
     department: null,
     assignmentStatus: "Unassigned",
   },
+  {
+    id: "act-notice-1",
+    activityName: "Quiz Notice",
+    assignedObId: null,
+    assignedObName: null,
+    department: null,
+    assignmentStatus: "Unassigned",
+  },
+  {
+    id: "act-notice-2",
+    activityName: "Event Notice",
+    assignedObId: null,
+    assignedObName: null,
+    department: null,
+    assignmentStatus: "Unassigned",
+  },
+  {
+    id: "act-notice-3",
+    activityName: "Quiz Winners Notice",
+    assignedObId: null,
+    assignedObName: null,
+    department: null,
+    assignmentStatus: "Unassigned",
+  },
+  {
+    id: "act-notice-4",
+    activityName: "Active Participants Notice",
+    assignedObId: null,
+    assignedObName: null,
+    department: null,
+    assignmentStatus: "Unassigned",
+  },
+  {
+    id: "act-notice-5",
+    activityName: "Placement Questions Notice",
+    assignedObId: null,
+    assignedObName: null,
+    department: null,
+    assignmentStatus: "Unassigned",
+  },
 ];
 
 export const INITIAL_PROPOSALS: Proposal[] = [];

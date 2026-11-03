@@ -2,6 +2,34 @@ import { NextResponse } from "next/server";
 import { dbConnect } from "@/lib/db/dbConnect";
 import { Responsibility, OfficeBearer, AuditLog } from "@/lib/db/models";
 
+// Standard 8 Responsibilities (3 Core + 5 Notice Management Responsibilities)
+const STANDARD_RESPONSIBILITIES = [
+  { name: "Placement Questions", code: "PLACEMENT_QUESTIONS", description: "Weekly student assessment and technical problem sets" },
+  { name: "General Quiz", code: "GENERAL_QUIZ", description: "Speed trivia rounds covering cloud, AI, and developer concepts" },
+  { name: "Feed Community", code: "FEED_COMMUNITY", description: "Campus developer feeds, discussions, and technical articles" },
+  { name: "Quiz Notice", code: "QUIZ_NOTICE", description: "Publishes and manages weekly quiz announcement notices" },
+  { name: "Event Notice", code: "EVENT_NOTICE", description: "Publishes and manages offline club event notices" },
+  { name: "Quiz Winners Notice", code: "QUIZ_WINNERS_NOTICE", description: "Publishes and manages quiz winner felicitation notices" },
+  { name: "Active Participants Notice", code: "ACTIVE_PARTICIPANTS_NOTICE", description: "Publishes and manages active participant recognition notices" },
+  { name: "Placement Questions Notice", code: "PLACEMENT_QUESTIONS_NOTICE", description: "Publishes and manages placement question notices" },
+];
+
+async function ensureAllResponsibilities() {
+  for (const item of STANDARD_RESPONSIBILITIES) {
+    const exists = await Responsibility.findOne({
+      $or: [{ code: item.code }, { name: item.name }],
+    });
+    if (!exists) {
+      await Responsibility.create({
+        name: item.name,
+        code: item.code,
+        description: item.description,
+        status: "ACTIVE",
+      });
+    }
+  }
+}
+
 // GET /api/admin/assignments
 // Returns all responsibilities with their currently-assigned OB (if any).
 // This is the server-side source of truth for the assignment grid.
@@ -9,11 +37,25 @@ export async function GET() {
   try {
     await dbConnect();
 
-    // Fetch all active 1:1 responsibilities (Placement Questions, General Quiz, Feed Community)
+    // Auto-seed/ensure all 8 responsibilities exist in MongoDB
+    await ensureAllResponsibilities();
+
+    // Fetch all active 1:1 responsibilities (excluding Technical Games)
     const responsibilities = await Responsibility.find({
       status: "ACTIVE",
       name: { $ne: "Technical Games" },
-    }).sort({ name: 1 });
+    });
+
+    // Sort according to STANDARD_RESPONSIBILITIES order
+    const orderMap: Record<string, number> = {};
+    STANDARD_RESPONSIBILITIES.forEach((r, idx) => {
+      orderMap[r.name] = idx;
+    });
+    responsibilities.sort((a, b) => {
+      const idxA = orderMap[a.name] !== undefined ? orderMap[a.name] : 99;
+      const idxB = orderMap[b.name] !== undefined ? orderMap[b.name] : 99;
+      return idxA - idxB;
+    });
 
     // Fetch all OBs that have a responsibilityId set (i.e. currently assigned)
     const assignedObs = await OfficeBearer.find({ responsibilityId: { $ne: null } }).populate("responsibilityId");
@@ -128,7 +170,16 @@ export async function PUT(req: Request) {
     const allResponsibilities = await Responsibility.find({
       status: "ACTIVE",
       name: { $ne: "Technical Games" },
-    }).sort({ name: 1 });
+    });
+    const orderMap: Record<string, number> = {};
+    STANDARD_RESPONSIBILITIES.forEach((r, idx) => {
+      orderMap[r.name] = idx;
+    });
+    allResponsibilities.sort((a, b) => {
+      const idxA = orderMap[a.name] !== undefined ? orderMap[a.name] : 99;
+      const idxB = orderMap[b.name] !== undefined ? orderMap[b.name] : 99;
+      return idxA - idxB;
+    });
     const allAssignedObs = await OfficeBearer.find({ responsibilityId: { $ne: null } }).populate("responsibilityId");
     const respToObMap: Record<string, any> = {};
     for (const ob of allAssignedObs) {

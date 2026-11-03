@@ -3,6 +3,7 @@ import { AnnouncementBar } from "@/components/landing/AnnouncementBar";
 import { Hero } from "@/components/landing/Hero";
 import { MissionVision } from "@/components/landing/MissionVision";
 import { StorySections } from "@/components/landing/StorySections";
+import { NoticeBoardSection } from "@/components/landing/NoticeBoardSection";
 import { PlatformSection } from "@/components/landing/PlatformSection";
 import { Footer } from "@/components/landing/Footer";
 
@@ -20,17 +21,20 @@ export default function Home() {
         {/* 2. Hero Section */}
         <Hero />
 
-        {/* 3. Mission & Vision Section */}
+        {/* 3. Official MCC Notice Board (5 Dynamic Tabs) */}
+        <NoticeBoardSection />
+
+        {/* 4. Mission & Vision Section */}
         <MissionVision />
 
-        {/* 4, 5, 6, 7. Story Sections (IGNITE, INNOVATE, IMPACT, CONNECT) */}
+        {/* 5, 6, 7, 8. Story Sections (IGNITE, INNOVATE, IMPACT, CONNECT) */}
         <StorySections />
 
-        {/* 8. Explore MCC Platform */}
+        {/* 9. Explore MCC Platform */}
         <PlatformSection />
       </main>
 
-      {/* 9. Footer */}
+      {/* 10. Footer */}
       <Footer />
     </div>
   );

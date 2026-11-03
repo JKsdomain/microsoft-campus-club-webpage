@@ -11,8 +11,12 @@ import {
   Trash2,
   ChevronDown,
   ChevronUp,
-  UserX,
   Megaphone,
+  Briefcase,
+  HelpCircle,
+  Trophy,
+  Users,
+  Layers,
 } from "lucide-react";
 import { useAdminAuth } from "./AdminAuthProvider";
 import { Button } from "../ui/Button";
@@ -37,10 +41,17 @@ export const ResponsibilityAssignment: React.FC = () => {
 
   // Sub-events state for Event Notice
   const [events, setEvents] = useState<NoticeEventItem[]>([]);
-  const [showEventSubAssignments, setShowEventSubAssignments] = useState(true);
+  const [showEventSubAssignments, setShowEventSubAssignments] = useState(false);
   const [newEventName, setNewEventName] = useState("");
   const [newEventDesc, setNewEventDesc] = useState("");
   const [isAddingEvent, setIsAddingEvent] = useState(false);
+
+  // Sync selectedActivityId if initial assignment loads late
+  useEffect(() => {
+    if (!selectedActivityId && assignments.length > 0) {
+      setSelectedActivityId(assignments[0].id);
+    }
+  }, [assignments, selectedActivityId]);
 
   // Fetch notice events
   const loadEvents = async () => {
@@ -72,6 +83,20 @@ export const ResponsibilityAssignment: React.FC = () => {
       assignObToActivity(selectedActivityId, selectedObId);
       setNotification(
         `Assigned "${ob.name}" to strictly manage "${activity.activityName}". Any previous responsibility for this OB was replaced.`
+      );
+      setTimeout(() => setNotification(null), 4500);
+    }
+  };
+
+  // Direct 1-click assign from card
+  const handleQuickAssign = (activityId: string, obId: string) => {
+    if (!obId) return;
+    const activity = assignments.find((a) => a.id === activityId);
+    const ob = officeBearers.find((o) => o.id === obId);
+    if (activity && ob) {
+      assignObToActivity(activityId, obId);
+      setNotification(
+        `Assigned "${ob.name}" to strictly manage "${activity.activityName}".`
       );
       setTimeout(() => setNotification(null), 4500);
     }
@@ -146,6 +171,27 @@ export const ResponsibilityAssignment: React.FC = () => {
   };
 
   const isNoticeResp = (name: string) => name.toLowerCase().includes("notice");
+
+  // Filter into Core Activities (3) and Notice Modules (5)
+  const coreAssignments = assignments.filter((a) => !isNoticeResp(a.activityName));
+  const noticeAssignments = assignments.filter((a) => isNoticeResp(a.activityName));
+
+  const getNoticeIcon = (name: string) => {
+    switch (name) {
+      case "Quiz Notice":
+        return HelpCircle;
+      case "Event Notice":
+        return Calendar;
+      case "Quiz Winners Notice":
+        return Trophy;
+      case "Active Participants Notice":
+        return Users;
+      case "Placement Questions Notice":
+        return Briefcase;
+      default:
+        return Megaphone;
+    }
+  };
 
   return (
     <div className="space-y-8 animate-fade-in">
@@ -222,43 +268,104 @@ export const ResponsibilityAssignment: React.FC = () => {
         </form>
       </div>
 
-      {/* Responsibilities Grid */}
+      {/* SECTION 1: CORE ACTIVITY RESPONSIBILITIES (3 BOXES) */}
       <div className="space-y-4">
-        <h4 className="text-xs font-mono font-semibold uppercase tracking-wider text-[#94A3B8]">
-          CURRENT RESPONSIBILITY ASSIGNMENTS ({assignments.length})
-        </h4>
+        <div className="flex items-center gap-2">
+          <Layers className="w-4 h-4 text-[#0078D4]" />
+          <h4 className="text-xs font-mono font-semibold uppercase tracking-wider text-[#94A3B8]">
+            CORE ACTIVITY MODULES ({coreAssignments.length})
+          </h4>
+        </div>
 
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-          {assignments.map((act) => {
-            const isNotice = isNoticeResp(act.activityName);
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+          {coreAssignments.map((act) => (
+            <div
+              key={act.id}
+              className="p-5 rounded-2xl bg-[#0D1B2A] border border-white/10 flex flex-col justify-between shadow-md hover:border-white/20 transition-all space-y-4"
+            >
+              <div className="flex items-start justify-between gap-3">
+                <div className="space-y-1">
+                  <span className="text-[10px] font-mono text-[#0078D4] bg-[#0078D4]/10 px-2 py-0.5 rounded-full border border-[#0078D4]/20 inline-block">
+                    MCC ACTIVITY
+                  </span>
+                  <h4 className="text-base font-bold text-[#F8FAFC]">{act.activityName}</h4>
+                  <p className="text-xs text-[#94A3B8]">
+                    Assigned Lead:{" "}
+                    <span className="font-semibold text-white">
+                      {act.assignedObName || "Unassigned"}
+                    </span>
+                  </p>
+                </div>
+
+                <div>
+                  {act.assignmentStatus === "Assigned" ? (
+                    <span className="px-2.5 py-1 rounded-full text-xs font-semibold bg-emerald-500/10 text-emerald-400 border border-emerald-500/20 flex items-center space-x-1">
+                      <UserCheck className="w-3.5 h-3.5" />
+                      <span>Assigned</span>
+                    </span>
+                  ) : (
+                    <span className="px-2.5 py-1 rounded-full text-xs font-semibold bg-amber-500/10 text-amber-400 border border-amber-500/20">
+                      Unassigned
+                    </span>
+                  )}
+                </div>
+              </div>
+
+              {/* Inline Quick-Assign */}
+              <div className="pt-3 border-t border-white/5 flex items-center justify-between gap-2">
+                <span className="text-[11px] text-[#94A3B8] font-mono">Assign Lead:</span>
+                <select
+                  value={act.assignedObId || ""}
+                  onChange={(e) => handleQuickAssign(act.id, e.target.value)}
+                  className="h-8 px-2 rounded-lg bg-[#07111F] border border-white/15 text-white text-xs focus:outline-none focus:border-[#0078D4] max-w-[190px]"
+                >
+                  <option value="">-- Choose OB --</option>
+                  {officeBearers.map((ob) => (
+                    <option key={ob.id} value={ob.id}>
+                      {ob.name} ({ob.responsibility})
+                    </option>
+                  ))}
+                </select>
+              </div>
+            </div>
+          ))}
+        </div>
+      </div>
+
+      {/* SECTION 2: NOTICE MANAGEMENT RESPONSIBILITIES (5 BOXES FOR 5 EVENTS) */}
+      <div className="space-y-4 pt-4 border-t border-white/10">
+        <div className="flex items-center justify-between">
+          <div className="flex items-center gap-2">
+            <Megaphone className="w-4 h-4 text-purple-400" />
+            <h4 className="text-xs font-mono font-semibold uppercase tracking-wider text-purple-400">
+              NOTICE PUBLISHING MODULES — 5 EVENT BOXES ({noticeAssignments.length})
+            </h4>
+          </div>
+          <span className="text-[11px] font-mono text-[#22D3EE] bg-[#22D3EE]/10 px-2.5 py-0.5 rounded-full border border-[#22D3EE]/20">
+            1 DEDICATED OB PER NOTICE EVENT
+          </span>
+        </div>
+
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+          {noticeAssignments.map((act) => {
+            const Icon = getNoticeIcon(act.activityName);
             const isEventNotice = act.activityName === "Event Notice";
 
             return (
               <div
                 key={act.id}
-                className={`p-5 rounded-2xl bg-[#0D1B2A] border transition-all shadow-md ${
+                className={`p-5 rounded-2xl bg-[#0D1B2A] border transition-all flex flex-col justify-between shadow-lg space-y-4 ${
                   isEventNotice
-                    ? "border-[#0078D4]/40 md:col-span-2"
-                    : isNotice
-                    ? "border-purple-500/20 hover:border-purple-500/40"
-                    : "border-white/10 hover:border-white/20"
+                    ? "border-purple-500/30 hover:border-purple-500/50"
+                    : "border-purple-500/20 hover:border-purple-500/40"
                 }`}
               >
-                <div className="flex items-center justify-between">
-                  <div className="space-y-1">
-                    <div className="flex items-center gap-2">
-                      <span
-                        className={`text-[10px] font-mono px-2 py-0.5 rounded-full border ${
-                          isNotice
-                            ? "bg-purple-500/10 text-purple-300 border-purple-500/30"
-                            : "bg-[#0078D4]/10 text-[#0078D4] border-[#0078D4]/30"
-                        }`}
-                      >
-                        {isEventNotice
-                          ? "PARENT RESPONSIBILITY (DYNAMIC EVENTS)"
-                          : isNotice
-                          ? "NOTICE RESPONSIBILITY"
-                          : "MCC ACTIVITY"}
+                <div className="flex items-start justify-between gap-3">
+                  <div className="space-y-1.5">
+                    <div className="flex items-center gap-1.5">
+                      <span className="text-[10px] font-mono text-purple-300 bg-purple-500/10 px-2 py-0.5 rounded-full border border-purple-500/30 flex items-center gap-1">
+                        <Icon className="w-3 h-3 text-purple-300" />
+                        <span>NOTICE MODULE</span>
                       </span>
                     </div>
 
@@ -266,156 +373,130 @@ export const ResponsibilityAssignment: React.FC = () => {
                     <p className="text-xs text-[#94A3B8]">
                       Assigned Lead:{" "}
                       <span className="font-semibold text-white">
-                        {act.assignedObName || (isEventNotice ? "Assigned Per-Event Below" : "Unassigned")}
+                        {act.assignedObName || "Unassigned"}
                       </span>
                     </p>
                   </div>
 
                   <div>
                     {act.assignmentStatus === "Assigned" ? (
-                      <span className="px-3 py-1 rounded-full text-xs font-semibold bg-emerald-500/10 text-emerald-400 border border-emerald-500/20 flex items-center space-x-1">
+                      <span className="px-2.5 py-1 rounded-full text-xs font-semibold bg-emerald-500/10 text-emerald-400 border border-emerald-500/20 flex items-center space-x-1">
                         <UserCheck className="w-3.5 h-3.5" />
                         <span>Assigned</span>
                       </span>
                     ) : (
-                      <span className="px-3 py-1 rounded-full text-xs font-semibold bg-amber-500/10 text-amber-400 border border-amber-500/20">
-                        {isEventNotice ? "Multi-Event" : "Unassigned"}
+                      <span className="px-2.5 py-1 rounded-full text-xs font-semibold bg-amber-500/10 text-amber-400 border border-amber-500/20">
+                        Unassigned
                       </span>
                     )}
                   </div>
                 </div>
 
-                {/* SPECIAL SECTION FOR EVENT NOTICE SUB-EVENTS */}
-                {isEventNotice && (
-                  <div className="mt-5 pt-4 border-t border-white/10 space-y-4">
-                    <div className="flex items-center justify-between">
-                      <div className="flex items-center gap-2">
-                        <Calendar className="w-4 h-4 text-[#22D3EE]" />
-                        <span className="text-xs font-semibold uppercase tracking-wider text-[#22D3EE]">
-                          Event Notice Sub-Responsibilities ({events.length} Events)
-                        </span>
-                      </div>
+                {/* Inline Quick-Assign */}
+                <div className="pt-3 border-t border-white/5 space-y-3">
+                  <div className="flex items-center justify-between gap-2">
+                    <span className="text-[11px] text-[#94A3B8] font-mono">Assign Lead:</span>
+                    <select
+                      value={act.assignedObId || ""}
+                      onChange={(e) => handleQuickAssign(act.id, e.target.value)}
+                      className="h-8 px-2 rounded-lg bg-[#07111F] border border-white/15 text-white text-xs focus:outline-none focus:border-purple-500 max-w-[190px]"
+                    >
+                      <option value="">-- Choose OB --</option>
+                      {officeBearers.map((ob) => (
+                        <option key={ob.id} value={ob.id}>
+                          {ob.name} ({ob.responsibility})
+                        </option>
+                      ))}
+                    </select>
+                  </div>
+
+                  {/* Optional Event Sub-Assignment expansion for Event Notice */}
+                  {isEventNotice && (
+                    <div className="pt-2 border-t border-white/5">
                       <button
+                        type="button"
                         onClick={() => setShowEventSubAssignments(!showEventSubAssignments)}
-                        className="text-xs text-[#94A3B8] hover:text-white flex items-center gap-1 font-mono"
+                        className="text-[11px] text-[#22D3EE] hover:underline flex items-center gap-1 font-mono"
                       >
-                        <span>{showEventSubAssignments ? "Hide Events" : "Manage Events"}</span>
+                        <Calendar className="w-3 h-3" />
+                        <span>
+                          {showEventSubAssignments
+                            ? "Hide Sub-Events"
+                            : `Manage Specific Event Sub-Leads (${events.length})`}
+                        </span>
                         {showEventSubAssignments ? (
-                          <ChevronUp className="w-3.5 h-3.5" />
+                          <ChevronUp className="w-3 h-3" />
                         ) : (
-                          <ChevronDown className="w-3.5 h-3.5" />
+                          <ChevronDown className="w-3 h-3" />
                         )}
                       </button>
-                    </div>
 
-                    {showEventSubAssignments && (
-                      <div className="space-y-4 pt-2">
-                        {/* Event Add Form */}
-                        <form
-                          onSubmit={handleCreateEvent}
-                          className="p-3.5 rounded-xl bg-[#07111F] border border-white/10 grid grid-cols-1 sm:grid-cols-12 gap-3 items-end"
-                        >
-                          <div className="sm:col-span-5">
-                            <label className="block text-[11px] text-[#94A3B8] mb-1 font-mono">
-                              New Event Name
-                            </label>
+                      {showEventSubAssignments && (
+                        <div className="mt-3 p-3 rounded-xl bg-[#07111F] border border-white/10 space-y-3">
+                          {/* Event Add Form */}
+                          <div className="flex gap-2">
                             <input
                               type="text"
                               value={newEventName}
                               onChange={(e) => setNewEventName(e.target.value)}
-                              placeholder="e.g. Hackathon, Workshop, Symposium"
-                              className="w-full h-9 px-3 rounded-lg bg-[#0D1B2A] border border-white/15 text-white text-xs focus:outline-none focus:border-[#0078D4]"
-                              required
+                              placeholder="Event name (e.g. Workshop, Hackathon)"
+                              className="flex-1 h-8 px-2 rounded-lg bg-[#0D1B2A] border border-white/15 text-white text-xs focus:outline-none focus:border-[#0078D4]"
                             />
-                          </div>
-                          <div className="sm:col-span-4">
-                            <label className="block text-[11px] text-[#94A3B8] mb-1 font-mono">
-                              Description (Optional)
-                            </label>
-                            <input
-                              type="text"
-                              value={newEventDesc}
-                              onChange={(e) => setNewEventDesc(e.target.value)}
-                              placeholder="Event scope or guidelines"
-                              className="w-full h-9 px-3 rounded-lg bg-[#0D1B2A] border border-white/15 text-white text-xs focus:outline-none focus:border-[#0078D4]"
-                            />
-                          </div>
-                          <div className="sm:col-span-3">
-                            <Button
-                              type="submit"
-                              variant="secondary"
-                              size="sm"
+                            <button
+                              type="button"
+                              onClick={handleCreateEvent}
                               disabled={isAddingEvent || !newEventName.trim()}
-                              className="w-full h-9 text-xs"
-                              leftIcon={<Plus className="w-3.5 h-3.5" />}
+                              className="px-2.5 h-8 rounded-lg bg-[#0078D4] text-white text-xs font-semibold hover:bg-[#0078D4]/90 disabled:opacity-40"
                             >
-                              Add Event
-                            </Button>
+                              Add
+                            </button>
                           </div>
-                        </form>
 
-                        {/* Events Table / List */}
-                        <div className="divide-y divide-white/5 border border-white/10 rounded-xl overflow-hidden bg-[#07111F]">
-                          {events.length === 0 ? (
-                            <div className="p-4 text-center text-xs text-[#94A3B8]">
-                              No events configured yet. Add your first event above.
-                            </div>
-                          ) : (
-                            events.map((ev) => (
-                              <div
-                                key={ev.id}
-                                className="p-3 sm:px-4 flex flex-col sm:flex-row sm:items-center justify-between gap-3 hover:bg-white/[0.02]"
-                              >
-                                <div className="space-y-0.5">
-                                  <div className="flex items-center gap-2">
-                                    <span className="text-xs font-bold text-[#F8FAFC]">
-                                      {ev.name}
+                          {/* Events Sub-List */}
+                          <div className="space-y-1.5 max-h-48 overflow-y-auto">
+                            {events.length === 0 ? (
+                              <p className="text-[10px] text-[#94A3B8] italic">No sub-events configured.</p>
+                            ) : (
+                              events.map((ev) => (
+                                <div
+                                  key={ev.id}
+                                  className="p-2 rounded-lg bg-[#0D1B2A] border border-white/5 flex items-center justify-between gap-2"
+                                >
+                                  <div className="truncate flex-1">
+                                    <span className="text-xs font-bold text-white block truncate">{ev.name}</span>
+                                    <span className="text-[10px] text-[#94A3B8] font-mono">
+                                      Lead: {ev.assignedObName || "Unassigned"}
                                     </span>
-                                    {ev.assignedObName ? (
-                                      <span className="text-[10px] px-2 py-0.5 rounded bg-emerald-500/10 text-emerald-300 font-mono">
-                                        Assigned: {ev.assignedObName}
-                                      </span>
-                                    ) : (
-                                      <span className="text-[10px] px-2 py-0.5 rounded bg-amber-500/10 text-amber-300 font-mono">
-                                        Unassigned
-                                      </span>
-                                    )}
                                   </div>
-                                  {ev.description && (
-                                    <p className="text-[11px] text-[#94A3B8]">{ev.description}</p>
-                                  )}
-                                </div>
-
-                                <div className="flex items-center gap-2 sm:self-center">
                                   <select
                                     value={ev.assignedObId || ""}
                                     onChange={(e) => handleAssignObToEvent(ev.id, e.target.value)}
-                                    className="h-8 px-2 rounded-lg bg-[#0D1B2A] border border-white/15 text-white text-xs focus:outline-none focus:border-[#0078D4] max-w-[220px]"
+                                    className="h-7 px-1.5 rounded bg-[#07111F] border border-white/15 text-white text-[11px] max-w-[120px]"
                                   >
-                                    <option value="">-- Assign OB to this Event --</option>
+                                    <option value="">Assign OB</option>
                                     {officeBearers.map((ob) => (
                                       <option key={ob.id} value={ob.id}>
-                                        {ob.name} ({ob.responsibility})
+                                        {ob.name}
                                       </option>
                                     ))}
                                   </select>
-
                                   <button
+                                    type="button"
                                     onClick={() => handleDeleteEvent(ev.id, ev.name)}
-                                    title="Delete Event"
-                                    className="p-1.5 rounded-lg text-red-400 hover:text-red-300 hover:bg-red-500/10"
+                                    className="text-red-400 hover:text-red-300 p-1"
+                                    title="Delete event"
                                   >
-                                    <Trash2 className="w-4 h-4" />
+                                    <Trash2 className="w-3.5 h-3.5" />
                                   </button>
                                 </div>
-                              </div>
-                            ))
-                          )}
+                              ))
+                            )}
+                          </div>
                         </div>
-                      </div>
-                    )}
-                  </div>
-                )}
+                      )}
+                    </div>
+                  )}
+                </div>
               </div>
             );
           })}
